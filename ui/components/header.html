@@ -1,0 +1,148 @@
+﻿<!-- ui/components/header.html -->
+<header class="pagecheck-header">
+    <div class="header-content">
+        <div class="header-brand">
+            <img src="../assets/icons/icon-48.png" alt="PageCheck Logo"
+                 class="header-logo" data-i18n-alt="logoAlt">
+            <div class="header-text">
+                <h1 data-i18n="extName">PageCheck: Security Scanner</h1>
+                <p class="header-subtitle" data-i18n="extDescription">
+                    Scanner for hidden elements and prompts
+                </p>
+            </div>
+        </div>
+
+        <nav class="header-nav" aria-label="Main navigation">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="dashboard" data-i18n="dashboard">
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="modules" data-i18n="modules">
+                        Modules
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="settings" data-i18n="settings">
+                        Settings
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="stats" data-i18n="statistics">
+                        Statistics
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <div class="header-actions">
+        <div class="status-indicator" data-status="active">
+            <span class="status-dot"></span>
+            <span class="status-text" data-i18n="statusActive">Active</span>
+        </div>
+
+        <div class="quick-actions">
+            <button class="action-btn scan-btn" data-action="scan"
+                    data-i18n-title="scanTooltip" data-i18n="scan" type="button">
+                <span class="btn-icon">&#128269;</span>
+                <span class="btn-text">Scan</span>
+            </button>
+
+            <button class="action-btn settings-btn" data-action="settings"
+                    data-i18n-title="settingsTooltip" data-i18n="settings" type="button">
+                <span class="btn-icon">&#9881;</span>
+                <span class="btn-text">Settings</span>
+            </button>
+        </div>
+
+        <div class="help-menu">
+            <button class="help-btn" data-i18n-title="helpTooltip"
+                    aria-haspopup="true" aria-expanded="false" type="button">
+                <span class="help-icon">&#10067;</span>
+                <span class="help-text" data-i18n="help">Help</span>
+            </button>
+
+            <div class="help-dropdown" hidden>
+                <a href="#" class="dropdown-item" data-i18n="documentation">
+                    &#128218; Documentation
+                </a>
+                <a href="#" class="dropdown-item" data-i18n="reportIssue">
+                    &#128027; Report Issue
+                </a>
+                <a href="#" class="dropdown-item" data-i18n="about">
+                    &#8505; About
+                </a>
+                <hr class="dropdown-divider">
+                <button class="dropdown-item" data-action="feedback" data-i18n="sendFeedback" type="button">
+                    &#128172; Send Feedback
+                </button>
+            </div>
+        </div>
+
+        <button class="mobile-menu-btn" aria-label="Toggle menu"
+                data-i18n-aria-label="toggleMenu" type="button">
+            <span class="menu-icon"></span>
+            <span class="menu-icon"></span>
+            <span class="menu-icon"></span>
+        </button>
+    </div>
+
+    <div class="mobile-nav" hidden>
+        <nav class="mobile-nav-content" aria-label="Mobile navigation">
+            <a href="#" class="mobile-nav-link" data-page="dashboard" data-i18n="dashboard">
+                Dashboard
+            </a>
+            <a href="#" class="mobile-nav-link" data-page="modules" data-i18n="modules">
+                Modules
+            </a>
+            <a href="#" class="mobile-nav-link" data-page="settings" data-i18n="settings">
+                Settings
+            </a>
+            <a href="#" class="mobile-nav-link" data-page="stats" data-i18n="statistics">
+                Statistics
+            </a>
+        </nav>
+    </div>
+</header>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const header = document.querySelector('.pagecheck-header');
+        if (!header) return;
+
+        const helpBtn = header.querySelector('.help-btn');
+        const helpDropdown = header.querySelector('.help-dropdown');
+
+        if (helpBtn && helpDropdown) {
+            helpBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const isExpanded = helpDropdown.hidden;
+                helpDropdown.hidden = !isExpanded;
+                helpBtn.setAttribute('aria-expanded', String(!isExpanded));
+            });
+
+            document.addEventListener('click', function() {
+                helpDropdown.hidden = true;
+                helpBtn.setAttribute('aria-expanded', 'false');
+            });
+
+            helpDropdown.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        }
+
+        const mobileMenuBtn = header.querySelector('.mobile-menu-btn');
+        const mobileNav = header.querySelector('.mobile-nav');
+
+        if (mobileMenuBtn && mobileNav) {
+            mobileMenuBtn.addEventListener('click', function() {
+                const isVisible = mobileNav.hidden;
+                mobileNav.hidden = !isVisible;
+                mobileNav.setAttribute('data-visible', String(!isVisible));
+            });
+        }
+    });
+</script>

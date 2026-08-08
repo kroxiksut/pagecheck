@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>PageCheck API Interception Priority 2 Fixture</title>
+</head>
+<body>
+    <h1>Priority 2 resource metadata fixture</h1>
+    <p>This page uses only the local fixture server and contains no third-party resources.</p>
+
+    <img src="/image/ok.png" alt="Valid local PNG">
+    <img src="/image/declared-html" alt="Image request with declared document MIME">
+    <iframe src="/frame.html" title="Subframe traffic must not be observed"></iframe>
+    <label>
+        Password input must not be read
+        <input id="password-fixture" type="password" value="fixture-password-must-not-be-read">
+    </label>
+    <button id="run-request" type="button">Run local XHR scenarios</button>
+    <output id="result" aria-live="polite"></output>
+
+    <script>
+        document.getElementById('run-request').addEventListener('click', async () => {
+            const result = document.getElementById('result');
+            try {
+                const [okResponse, redirectResponse] = await Promise.all([
+                    fetch('/api/ok', { method: 'POST', body: 'fixture-body-must-not-be-read' }),
+                    fetch('/api/redirect')
+                ]);
+                result.textContent = `${okResponse.status}/${redirectResponse.status}`;
+            } catch {
+                result.textContent = 'request failed';
+            }
+        });
+    </script>
+</body>
+</html>

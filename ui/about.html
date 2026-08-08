@@ -1,0 +1,59 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="aboutPageTitle">About PageCheck</title>
+    <link rel="stylesheet" href="../styles/themes/light.css" id="light-theme" disabled>
+    <link rel="stylesheet" href="../styles/themes/dark.css" id="dark-theme" disabled>
+    <link rel="stylesheet" href="../styles/options.css">
+</head>
+<body>
+<div class="main-container">
+    <div id="content-container">
+        <section class="welcome-section">
+            <div class="welcome-content">
+                <h1 data-i18n="aboutPageTitle">About PageCheck</h1>
+                <p data-i18n="aboutPageIntro">
+                    This page is a stub for release information, project context, and extension metadata.
+                </p>
+            </div>
+        </section>
+
+        <div class="settings-grid">
+            <div class="settings-column">
+                <section class="settings-section">
+                    <div class="section-header">
+                        <h2 data-i18n="aboutPageStubTitle">Current State</h2>
+                    </div>
+                    <p data-i18n="aboutPageStub">
+                        The page already works from the popup and can be expanded later into a full release/about screen.
+                    </p>
+                </section>
+            </div>
+
+            <div class="settings-column">
+                <section class="settings-section">
+                    <div class="section-header">
+                        <h2 data-i18n="currentVersionLabel">Current Version</h2>
+                    </div>
+                    <p><strong data-i18n="currentVersionLabel">Current Version</strong>: <span id="current-version-value">0.0.1-pre-alpha</span></p>
+                    <p><strong data-i18n="aboutStatusLabel">Status</strong>: <span data-i18n="aboutStatusValue">MVP stub</span></p>
+                </section>
+            </div>
+        </div>
+
+        <div class="global-actions">
+            <div class="actions-group">
+                <button id="open-settings-btn" class="btn-primary" data-i18n="openSettings" type="button">
+                    Open Settings
+                </button>
+                <a class="btn-outline" href="./help.html" data-i18n="help">Help</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="../js/info-page.js"></script>
+</body>
+</html>

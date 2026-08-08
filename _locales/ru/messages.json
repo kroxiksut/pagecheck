@@ -1,0 +1,1322 @@
+﻿{
+    "extName": {
+        "message": "PageCheck: Сканер безопасности для скрытых элементов и промптов",
+        "description": "Название расширения"
+    },
+    "extShortName": {
+        "message": "PageCheck: Сканер безопасности",
+        "description": "Короткое название расширения"
+    },
+    "extDescription": {
+        "message": "Локальный анализ страниц: скрытый текст, обманные слои, фрагменты промптов. Источник сигнала, а не полная защита.",
+        "description": "Описание расширения"
+    },
+    "logoAlt": {
+        "message": "Логотип PageCheck",
+        "description": "Alt текст для логотипа"
+    },
+    "optionsTitle": {
+        "message": "Настройки PageCheck",
+        "description": "Заголовок страницы настроек"
+    },
+    "welcomeDescription": {
+        "message": "Настройте параметры сканера безопасности и модулей",
+        "description": "Приветственное описание на странице настроек"
+    },
+    "languageSettings": {
+        "message": "Настройки языка",
+        "description": "Секция настроек языка"
+    },
+    "appearanceSettings": {
+        "message": "Настройки внешнего вида",
+        "description": "Секция настроек внешнего вида"
+    },
+    "moduleSettings": {
+        "message": "Настройки модулей",
+        "description": "Секция настроек модулей"
+    },
+    "selectLanguage": {
+        "message": "Выберите язык:",
+        "description": "Лейбл выбора языка"
+    },
+    "autoLanguage": {
+        "message": "Авто (Язык браузера)",
+        "description": "Опция автоопределения языка"
+    },
+    "themeSettings": {
+        "message": "Настройки темы",
+        "description": "Секция настроек темы"
+    },
+    "currentTheme": {
+        "message": "Текущая: Системная",
+        "description": "Индикатор текущей темы"
+    },
+    "autoTheme": {
+        "message": "Авто (Системная)",
+        "description": "Опция автотемы"
+    },
+    "autoThemeDesc": {
+        "message": "Следует за системной темой",
+        "description": "Описание автотемы"
+    },
+    "lightTheme": {
+        "message": "Светлая",
+        "description": "Опция светлой темы"
+    },
+    "lightThemeDesc": {
+        "message": "Чистый и яркий интерфейс",
+        "description": "Описание светлой темы"
+    },
+    "darkTheme": {
+        "message": "Тёмная",
+        "description": "Опция тёмной темы"
+    },
+    "darkThemeDesc": {
+        "message": "Щадит глаза",
+        "description": "Описание тёмной темы"
+    },
+    "advancedSettings": {
+        "message": "Расширенные настройки",
+        "description": "Секция расширенных настроек"
+    },
+    "rememberTheme": {
+        "message": "Запомнить выбор темы",
+        "description": "Настройка сохранения темы"
+    },
+    "animationSpeed": {
+        "message": "Скорость анимации:",
+        "description": "Настройка скорости анимации"
+    },
+    "fast": {
+        "message": "Быстрая",
+        "description": "Опция быстрой скорости"
+    },
+    "normal": {
+        "message": "Обычная",
+        "description": "Опция обычной скорости"
+    },
+    "slow": {
+        "message": "Медленная",
+        "description": "Опция медленной скорости"
+    },
+    "toggleAll": {
+        "message": "Переключить все",
+        "description": "Кнопка переключения всех модулей"
+    },
+    "loadingModules": {
+        "message": "Загрузка модулей...",
+        "description": "Индикатор загрузки модулей"
+    },
+    "enableModule": {
+        "message": "Включить",
+        "description": "Чекбокс включения модуля"
+    },
+    "trackRemovedBlocks": {
+        "message": "Отслеживать удаляемые блоки",
+        "description": "Настройка отслеживания блоков"
+    },
+    "autoScan": {
+        "message": "Авто-сканирование при загрузке страницы",
+        "description": "Настройка автосканирования"
+    },
+    "allowIntervention": {
+        "message": "Разрешить вмешательство на странице для тестирования",
+        "description": "Тестовый флаг-разрешение для вмешательства на странице"
+    },
+    "scanInterval": {
+        "message": "Интервал сканирования (мс):",
+        "description": "Настройка интервала сканирования"
+    },
+    "maxElements": {
+        "message": "Макс. элементов за сканирование:",
+        "description": "Настройка максимального количества элементов"
+    },
+    "detectionSettings": {
+        "message": "Настройки обнаружения",
+        "description": "Секция настроек обнаружения"
+    },
+    "sensitivity": {
+        "message": "Чувствительность:",
+        "description": "Настройка чувствительности"
+    },
+    "sensitivityLow": {
+        "message": "Низкая",
+        "description": "Опция низкой чувствительности"
+    },
+    "sensitivityMedium": {
+        "message": "Средняя",
+        "description": "Опция средней чувствительности"
+    },
+    "sensitivityHigh": {
+        "message": "Высокая",
+        "description": "Опция высокой чувствительности"
+    },
+    "actionOnDetect": {
+        "message": "Действие при обнаружении:",
+        "description": "Настройка действия при обнаружении"
+    },
+    "actionLog": {
+        "message": "Только логировать",
+        "description": "Опция логирования"
+    },
+    "actionBlock": {
+        "message": "Блокировать автоматически",
+        "description": "Опция блокировки"
+    },
+    "actionNotify": {
+        "message": "Уведомлять пользователя",
+        "description": "Опция уведомления"
+    },
+    "debugMode": {
+        "message": "Включить режим отладки",
+        "description": "Настройка режима отладки"
+    },
+    "customRules": {
+        "message": "Пользовательские правила (JSON):",
+        "description": "Настройка пользовательских правил"
+    },
+    "customRulesPlaceholder": {
+        "message": "{\"rules\": []}",
+        "description": "Плейсхолдер пользовательских правил"
+    },
+    "resetToDefault": {
+        "message": "Сбросить настройки",
+        "description": "Кнопка сброса настроек"
+    },
+    "triggerPhrases": {
+        "message": "Триггерные фразы",
+        "description": "Название модуля триггерных фраз"
+    },
+    "promptSplitting": {
+        "message": "Разделение промптов",
+        "description": "Название модуля разделения промптов"
+    },
+    "apiInterceptor": {
+        "message": "Перехватчик API",
+        "description": "Название модуля перехвата API"
+    },
+    "saveSettings": {
+        "message": "Сохранить настройки",
+        "description": "Кнопка сохранения настроек"
+    },
+    "resetSettings": {
+        "message": "Сбросить настройки",
+        "description": "Кнопка сброса настроек"
+    },
+    "exportSettings": {
+        "message": "Экспорт настроек",
+        "description": "Кнопка экспорта настроек"
+    },
+    "importSettings": {
+        "message": "Импорт настроек",
+        "description": "Кнопка импорта настроек"
+    },
+    "confirmReset": {
+        "message": "Вы уверены, что хотите сбросить все настройки по умолчанию?",
+        "description": "Сообщение подтверждения сброса"
+    },
+    "popupTitle": {
+        "message": "Сканер безопасности",
+        "description": "Заголовок попапа"
+    },
+    "active": {
+        "message": "Активен",
+        "description": "Статус активен"
+    },
+    "inactive": {
+        "message": "Неактивен",
+        "description": "Статус неактивен"
+    },
+    "scanPage": {
+        "message": "Сканировать страницу",
+        "description": "Кнопка сканирования страницы"
+    },
+    "threatsBlocked": {
+        "message": "Угроз заблокировано:",
+        "description": "Счётчик заблокированных угроз"
+    },
+    "lastScan": {
+        "message": "Последнее сканирование:",
+        "description": "Время последнего сканирования"
+    },
+    "activeModules": {
+        "message": "Активные модули",
+        "description": "Секция активных модулей"
+    },
+    "quickActions": {
+        "message": "Быстрые действия",
+        "description": "Секция быстрых действий"
+    },
+    "enableAll": {
+        "message": "Включить все",
+        "description": "Кнопка включения всех модулей"
+    },
+    "disableAll": {
+        "message": "Отключить все",
+        "description": "Кнопка отключения всех модулей"
+    },
+    "viewReport": {
+        "message": "Посмотреть отчёт",
+        "description": "Кнопка просмотра отчёта"
+    },
+    "currentPage": {
+        "message": "Текущая страница",
+        "description": "Секция текущей страницы"
+    },
+    "statusSafe": {
+        "message": "Безопасно",
+        "description": "Статус безопасно"
+    },
+    "statusWarning": {
+        "message": "Предупреждение",
+        "description": "Статус предупреждение"
+    },
+    "statusDanger": {
+        "message": "Опасность",
+        "description": "Статус опасность"
+    },
+    "dashboard": {
+        "message": "Панель управления",
+        "description": "Навигация панель управления"
+    },
+    "modules": {
+        "message": "Модули",
+        "description": "Навигация модули"
+    },
+    "settings": {
+        "message": "Настройки",
+        "description": "Навигация настройки"
+    },
+    "statistics": {
+        "message": "Статистика",
+        "description": "Навигация статистика"
+    },
+    "openSettings": {
+        "message": "Открыть настройки",
+        "description": "Тултип открытия настроек"
+    },
+    "scanTooltip": {
+        "message": "Сканировать текущую страницу",
+        "description": "Тултип кнопки сканирования"
+    },
+    "settingsTooltip": {
+        "message": "Открыть настройки",
+        "description": "Тултип кнопки настроек"
+    },
+    "helpTooltip": {
+        "message": "Получить помощь",
+        "description": "Тултип кнопки помощи"
+    },
+    "help": {
+        "message": "Помощь",
+        "description": "Кнопка помощи"
+    },
+    "documentation": {
+        "message": "Документация",
+        "description": "Ссылка на документацию"
+    },
+    "reportIssue": {
+        "message": "Сообщить о проблеме",
+        "description": "Ссылка сообщения о проблеме"
+    },
+    "about": {
+        "message": "О программе",
+        "description": "Ссылка о программе"
+    },
+    "sendFeedback": {
+        "message": "Отправить отзыв",
+        "description": "Кнопка отправки отзыва"
+    },
+    "settingsSaved": {
+        "message": "Настройки успешно сохранены!",
+        "description": "Уведомление о сохранении настроек"
+    },
+    "settingsReset": {
+        "message": "Настройки сброшены по умолчанию!",
+        "description": "Уведомление о сбросе настроек"
+    },
+    "saveError": {
+        "message": "Ошибка сохранения настроек!",
+        "description": "Уведомление об ошибке сохранения"
+    },
+    "resetError": {
+        "message": "Ошибка сброса настроек!",
+        "description": "Уведомление об ошибке сброса"
+    },
+    "componentLoadError": {
+        "message": "Не удалось загрузить компонент",
+        "description": "Ошибка загрузки компонента"
+    },
+    "reloadPage": {
+        "message": "Перезагрузить страницу",
+        "description": "Кнопка перезагрузки страницы"
+    },
+    "elementsScanned": {
+        "message": "Элементов просканировано",
+        "description": "Статистика просканированных элементов"
+    },
+    "threatsDetected": {
+        "message": "Угроз обнаружено",
+        "description": "Статистика обнаруженных угроз"
+    },
+    "lastScanTime": {
+        "message": "Время последнего сканирования",
+        "description": "Статистика времени сканирования"
+    },
+    "enabled": {
+        "message": "Включено",
+        "description": "Метка включенного состояния"
+    },
+    "disabled": {
+        "message": "Выключено",
+        "description": "Метка выключенного состояния"
+    },
+    "module": {
+        "message": "Модуль",
+        "description": "Общая метка модуля"
+    },
+    "scanNow": {
+        "message": "Сканировать сейчас",
+        "description": "Действие быстрого сканирования"
+    },
+    "testModule": {
+        "message": "Тест",
+        "description": "Действие тестирования модуля"
+    },
+    "scanCompleted": {
+        "message": "Сканирование завершено",
+        "description": "Сообщение успешного сканирования"
+    },
+    "scanFailed": {
+        "message": "Ошибка сканирования",
+        "description": "Сообщение об ошибке сканирования"
+    },
+    "toggleFailed": {
+        "message": "Не удалось переключить модуль",
+        "description": "Сообщение об ошибке переключения"
+    },
+    "showSettings": {
+        "message": "Показать настройки",
+        "description": "Действие открытия настроек модуля"
+    },
+    "hideSettings": {
+        "message": "Скрыть настройки",
+        "description": "Действие скрытия настроек модуля"
+    },
+    "generalSettings": {
+        "message": "Общие настройки",
+        "description": "Заголовок группы общих настроек"
+    },
+    "performanceSettings": {
+        "message": "Настройки производительности",
+        "description": "Заголовок группы настроек производительности"
+    },
+    "moduleName": {
+        "message": "Название модуля",
+        "description": "Общий плейсхолдер названия модуля"
+    },
+    "moduleDescription": {
+        "message": "Описание модуля",
+        "description": "Общий плейсхолдер описания модуля"
+    },
+    "pagesScanned": {
+        "message": "Страниц просканировано",
+        "description": "Метка счётчика просканированных страниц"
+    },
+    "scan": {
+        "message": "Скан",
+        "description": "Действие сканирования в шапке"
+    },
+    "statusActive": {
+        "message": "Активен",
+        "description": "Метка активного статуса в шапке"
+    },
+    "welcomeMessage": {
+        "message": "Спасибо за установку PageCheck! Ваш браузер теперь под защитой.",
+        "description": "Приветственное сообщение"
+    },
+    "detectLinkMismatch": {
+        "message": "Выявлять несовпадение текста и ссылки",
+        "description": "Настройка выявления несовпадения текста и ссылки"
+    },
+    "detectRedirectPatterns": {
+        "message": "Выявлять redirect-паттерны",
+        "description": "Настройка выявления redirect-паттернов"
+    },
+    "visualManipulation": {
+        "message": "Скрытый контент и визуальные манипуляции",
+        "description": "Метка модуля визуальных манипуляций"
+    },
+    "monitorOnly": {
+        "message": "Только мониторинг",
+        "description": "Настройка режима только мониторинга"
+    },
+    "detectHomographs": {
+        "message": "Выявлять гомографы",
+        "description": "Настройка выявления гомографов"
+    },
+    "detectOverlays": {
+        "message": "Выявлять обманные overlay",
+        "description": "Настройка выявления overlay"
+    },
+    "detectStyleObfuscation": {
+        "message": "Выявлять CSS-обфускацию",
+        "description": "Настройка выявления CSS-обфускации"
+    },
+    "detectHiddenText": {
+        "message": "Выявлять скрытый текст",
+        "description": "Настройка выявления скрытого текста"
+    },
+    "findingHiddenTextDisplayNoneSummary": {
+        "message": "Возможен скрытый текст через display: none",
+        "description": "Сводка для детекта скрытого текста через display none"
+    },
+    "findingHiddenTextDisplayNoneDetails": {
+        "message": "$1 [display:none $2 ($3); mode=$4]",
+        "description": "Детали детекта скрытого текста через display none с источником, типом совпадения и режимом"
+    },
+    "findingHiddenTextDisplayNoneDetailsCollapsed": {
+        "message": "$1 [display:none на контейнере ($3); пример скрытого узла: $2; режим=$4]",
+        "description": "Детали детекта скрытого текста, свёрнутого к скрывающему контейнеру: контейнер, пример узла, тип совпадения и режим"
+    },
+    "findingHiddenTextGenericSummary": {
+        "message": "Возможен скрытый или визуально подавленный текст",
+        "description": "Сводка для общего детекта скрытого текста"
+    },
+    "findingHiddenTextVisibilitySummary": {
+        "message": "Возможен скрытый текст через visibility: hidden",
+        "description": "Сводка для детекта скрытого текста через visibility hidden"
+    },
+    "findingHiddenTextVisibilityDetails": {
+        "message": "$1 [visibility:hidden $2 ($3)]",
+        "description": "Детали детекта скрытого текста через visibility hidden с источником и типом совпадения"
+    },
+    "findingHiddenTextOpacitySummary": {
+        "message": "Возможен скрытый текст через opacity: 0",
+        "description": "Сводка для детекта скрытого текста через opacity zero"
+    },
+    "findingHiddenTextOpacityDetails": {
+        "message": "$1 [opacity:0 $2 ($3)]",
+        "description": "Детали детекта скрытого текста через opacity zero с источником и типом совпадения"
+    },
+    "findingHiddenTextOffscreenSummary": {
+        "message": "Возможен скрытый текст через намеренный унос за пределы экрана",
+        "description": "Сводка для детекта скрытого текста через намеренное off-screen позиционирование"
+    },
+    "findingHiddenTextOffscreenDetails": {
+        "message": "$1 [off-screen $2; signals=$3; position=$4; rect=$5]",
+        "description": "Детали детекта скрытого текста через off-screen позиционирование с источником, типом сигнала, позицией и снимком rect"
+    },
+    "findingOffscreenSignalCoordinates": {
+        "message": "координаты",
+        "description": "Метка сигнала off-screen детекта по координатам"
+    },
+    "findingOffscreenSignalTransform": {
+        "message": "transform",
+        "description": "Метка сигнала off-screen детекта по transform"
+    },
+    "findingOffscreenSignalCoordinatesAndTransform": {
+        "message": "координаты+transform",
+        "description": "Метка сигнала off-screen детекта по комбинации координат и transform"
+    },
+    "findingHiddenTextFontSizeSummary": {
+        "message": "Возможен скрытый текст через подавление размера шрифта",
+        "description": "Сводка для детекта скрытого текста через font-size suppression"
+    },
+    "findingHiddenTextFontSizeDetails": {
+        "message": "$1 [font-size $2; value=$3px; source=$4 ($5); context=$6; textLen=$7]",
+        "description": "Детали детекта скрытого текста через подавление размера шрифта с режимом, значением, источником, типом совпадения, контекстом и длиной текста"
+    },
+    "findingFontSizeModeZero": {
+        "message": "font-size: 0",
+        "description": "Метка режима подавления размера шрифта для нулевого значения"
+    },
+    "findingFontSizeModeNearZero": {
+        "message": "почти нулевой размер шрифта (<= 1px)",
+        "description": "Метка режима подавления размера шрифта для почти нулевого значения"
+    },
+    "findingFontSizeModeAnomalous": {
+        "message": "аномально маленький размер шрифта (> 1px)",
+        "description": "Метка режима подавления размера шрифта для аномально малого значения"
+    },
+    "findingFontSizeContextNone": {
+        "message": "нет",
+        "description": "Метка контекста для font-size suppression при отсутствии дополнительных сигналов"
+    },
+    "findingFontSizeContextOffscreen": {
+        "message": "off-screen",
+        "description": "Метка контекста для font-size suppression при сигнале уноса за экран"
+    },
+    "findingFontSizeContextOpacity": {
+        "message": "пониженная непрозрачность",
+        "description": "Метка контекста для font-size suppression при сигнале низкой opacity"
+    },
+    "findingFontSizeContextClipping": {
+        "message": "clipping",
+        "description": "Метка контекста для font-size suppression при clipping-сигнале"
+    },
+    "findingFontSizeContextLowContrast": {
+        "message": "низкий контраст",
+        "description": "Метка контекста для font-size suppression при сигнале низкого контраста"
+    },
+    "findingFontSizeContextOverlay": {
+        "message": "overlay-контекст",
+        "description": "Метка контекста для font-size suppression при overlay-контексте"
+    },
+    "findingHiddenTextContrastSummary": {
+        "message": "Возможен скрытый текст через камуфляж контраста текста и фона",
+        "description": "Сводка для детекта скрытого текста через contrast camouflage"
+    },
+    "findingHiddenTextContrastDetails": {
+        "message": "$1 [contrast $2; ratio=$3; colorDistance=$4; context=$5; textLen=$6]",
+        "description": "Детали детекта скрытого текста через contrast camouflage с режимом, ratio, distance, контекстом и длиной текста"
+    },
+    "findingContrastModeNearMatch": {
+        "message": "почти совпадающие цвета",
+        "description": "Метка режима contrast camouflage для почти совпадающих цветов текста и фона"
+    },
+    "findingContrastModeLowContrast": {
+        "message": "низкий контраст",
+        "description": "Метка режима contrast camouflage для низкого контраста текста и фона"
+    },
+    "findingContrastContextNone": {
+        "message": "нет",
+        "description": "Метка контекста contrast camouflage при отсутствии дополнительных подозрительных сигналов"
+    },
+    "findingContrastContextSmallFont": {
+        "message": "маленький размер шрифта",
+        "description": "Метка контекста contrast camouflage для маленького размера шрифта"
+    },
+    "findingContrastContextOpacity": {
+        "message": "пониженная непрозрачность",
+        "description": "Метка контекста contrast camouflage для низкой opacity"
+    },
+    "findingContrastContextOffscreen": {
+        "message": "off-screen",
+        "description": "Метка контекста contrast camouflage для уноса за экран"
+    },
+    "findingContrastContextClipping": {
+        "message": "clipping",
+        "description": "Метка контекста contrast camouflage для clipping"
+    },
+    "findingContrastContextOverlay": {
+        "message": "overlay-контекст",
+        "description": "Метка контекста contrast camouflage для overlay-контекста"
+    },
+    "findingHiddenTextTransparentSummary": {
+        "message": "Возможен скрытый текст через прозрачный цвет текста",
+        "description": "Сводка для детекта скрытого текста через прозрачную заливку глифов"
+    },
+    "findingHiddenTextTransparentDetails": {
+        "message": "$1 [прозрачный текст $2; alpha=$3; источник=$4 ($5); контекст=$6; textLen=$7]",
+        "description": "Детали для скрытого текста через прозрачный цвет: режим, альфа, источник, тип совпадения, контекст и длина текста"
+    },
+    "findingTransparentTextModeFull": {
+        "message": "полностью прозрачный (alpha 0)",
+        "description": "Метка режима прозрачного текста для полностью прозрачной заливки глифов"
+    },
+    "findingTransparentTextModeNear": {
+        "message": "почти прозрачный (alpha <= 0.05)",
+        "description": "Метка режима прозрачного текста для почти прозрачной заливки глифов"
+    },
+    "findingTransparentTextContextNone": {
+        "message": "нет",
+        "description": "Метка контекста прозрачного текста при отсутствии дополнительных сигналов"
+    },
+    "findingTransparentTextContextTextVolume": {
+        "message": "большой объём текста",
+        "description": "Метка контекста прозрачного текста для большого объёма скрытого текста"
+    },
+    "findingTransparentTextContextOffscreen": {
+        "message": "off-screen",
+        "description": "Метка контекста прозрачного текста при сигнале уноса за экран"
+    },
+    "findingTransparentTextContextClipping": {
+        "message": "clipping-контекст",
+        "description": "Метка контекста прозрачного текста для clipping-контекста"
+    },
+    "findingTransparentTextContextOverlay": {
+        "message": "overlay-контекст",
+        "description": "Метка контекста прозрачного текста для overlay-контекста"
+    },
+    "findingHiddenTextTextIndentSummary": {
+        "message": "Возможен скрытый текст через отрицательный text-indent",
+        "description": "Сводка для детекта скрытого текста через negative text-indent"
+    },
+    "findingHiddenTextTextIndentDetails": {
+        "message": "$1 [text-indent $2; value=$3; source=$4 ($5); context=$6; lineModel=$7; textLen=$8]",
+        "description": "Детали детекта скрытого текста через negative text-indent с режимом, значением, источником, типом совпадения, контекстом, line model и длиной текста"
+    },
+    "findingTextIndentModeExtreme": {
+        "message": "экстремально отрицательный text-indent",
+        "description": "Метка режима negative text-indent для экстремального смещения текста"
+    },
+    "findingTextIndentModeSignificant": {
+        "message": "существенно отрицательный text-indent",
+        "description": "Метка режима negative text-indent для существенного смещения текста"
+    },
+    "findingTextIndentContextNone": {
+        "message": "нет",
+        "description": "Метка контекста negative text-indent при отсутствии дополнительных сигналов"
+    },
+    "findingTextIndentContextOverflowHidden": {
+        "message": "overflow hidden",
+        "description": "Метка контекста negative text-indent для overflow hidden"
+    },
+    "findingTextIndentContextNoWrap": {
+        "message": "no-wrap",
+        "description": "Метка контекста negative text-indent для white-space nowrap"
+    },
+    "findingTextIndentContextSmallContainer": {
+        "message": "узкий контейнер",
+        "description": "Метка контекста negative text-indent для узкой ширины контейнера"
+    },
+    "findingTextIndentContextOpacity": {
+        "message": "пониженная непрозрачность",
+        "description": "Метка контекста negative text-indent для низкой opacity"
+    },
+    "findingTextIndentContextLowContrast": {
+        "message": "низкий контраст",
+        "description": "Метка контекста negative text-indent для низкого контраста"
+    },
+    "findingTextIndentContextClipping": {
+        "message": "clipping",
+        "description": "Метка контекста negative text-indent для clipping"
+    },
+    "findingTextIndentContextOverlay": {
+        "message": "overlay-контекст",
+        "description": "Метка контекста negative text-indent для overlay-контекста"
+    },
+    "findingTextIndentLineModelLikelyFullHide": {
+        "message": "вероятно полное скрытие текста",
+        "description": "Метка line model negative text-indent для вероятного полного скрытия текста"
+    },
+    "findingTextIndentLineModelFirstLineOnlyRisk": {
+        "message": "риск скрытия только первой строки",
+        "description": "Метка line model negative text-indent для риска скрытия только первой строки"
+    },
+    "findingDisplayNoneSourceSelf": {
+        "message": "сам элемент",
+        "description": "Метка источника display none для самого элемента"
+    },
+    "findingDisplayNoneSourceAncestor": {
+        "message": "предок",
+        "description": "Метка источника display none для предка"
+    },
+    "findingDisplayNoneMatchTypeInline": {
+        "message": "inline",
+        "description": "Метка типа совпадения display none для inline-стиля"
+    },
+    "findingDisplayNoneMatchTypeComputed": {
+        "message": "computed",
+        "description": "Метка типа совпадения display none для computed-стиля"
+    },
+    "findingHiddenInputSummary": {
+        "message": "Возможна скрытая область ввода или редактирования",
+        "description": "Сводка для детекта скрытого поля ввода"
+    },
+    "findingHiddenInputConsentSummary": {
+        "message": "Возможен скрытый control согласия пользователя",
+        "description": "Сводка для детекта скрытого контрола, связанного с согласием"
+    },
+    "findingHiddenInputUploadSummary": {
+        "message": "Возможен скрытый control загрузки файла",
+        "description": "Сводка для детекта скрытого file-upload контрола"
+    },
+    "findingHiddenInputDetails": {
+        "message": "$1 [control=$2; subtype=$3; reason=$4; source=$5 ($6); context=$7; contextSignals=$8]",
+        "description": "Детали детекта скрытого поля ввода с типом элемента, subtype, причиной, источником, типом совпадения, контекстной категорией и контекстными сигналами"
+    },
+    "findingHiddenInputConsentDetails": {
+        "message": "$1 [consent control=$2; subtype=$3; reason=$4; source=$5 ($6); context=$7; contextSignals=$8]",
+        "description": "Детали детекта скрытого контрола согласия пользователя"
+    },
+    "findingHiddenInputUploadDetails": {
+        "message": "$1 [upload control=$2; subtype=$3; reason=$4; source=$5 ($6); context=$7; contextSignals=$8]",
+        "description": "Детали детекта скрытого file-upload контрола"
+    },
+    "findingHiddenEditableSummary": {
+        "message": "Возможна скрытая редактируемая поверхность",
+        "description": "Сводка для детекта скрытой editable-поверхности"
+    },
+    "findingHiddenEditableDetails": {
+        "message": "$1 [editable control=$2; subtype=$3; reason=$4; source=$5 ($6); context=$7; contextSignals=$8]",
+        "description": "Детали детекта скрытой editable-поверхности"
+    },
+    "findingHiddenInputReasonHidden": {
+        "message": "атрибут hidden",
+        "description": "Метка причины для hidden input через атрибут hidden"
+    },
+    "findingHiddenInputReasonDisplayNone": {
+        "message": "display: none",
+        "description": "Метка причины для hidden input через display none"
+    },
+    "findingHiddenInputReasonVisibilityHidden": {
+        "message": "visibility: hidden",
+        "description": "Метка причины для hidden input через visibility hidden"
+    },
+    "findingHiddenInputReasonOpacityZero": {
+        "message": "opacity: 0",
+        "description": "Метка причины для hidden input через opacity zero"
+    },
+    "findingHiddenInputReasonOffscreen": {
+        "message": "off-screen",
+        "description": "Метка причины для hidden input через унос за экран"
+    },
+    "findingHiddenInputReasonZeroSize": {
+        "message": "нулевой размер",
+        "description": "Метка причины для hidden input через нулевой или почти нулевой размер"
+    },
+    "findingHiddenInputReasonVisualHidden": {
+        "message": "fallback визуального скрытия",
+        "description": "Метка причины для hidden input через общий visual-hidden fallback"
+    },
+    "findingHiddenInputMatchTypeAttribute": {
+        "message": "attribute",
+        "description": "Метка типа совпадения для hidden input через атрибут"
+    },
+    "findingHiddenInputMatchTypeGeometry": {
+        "message": "geometry",
+        "description": "Метка типа совпадения для hidden input через геометрию"
+    },
+    "findingHiddenInputContextConsent": {
+        "message": "consent",
+        "description": "Метка контекстной категории для hidden control, связанного с согласием"
+    },
+    "findingHiddenInputContextUpload": {
+        "message": "upload",
+        "description": "Метка контекстной категории для hidden upload-control"
+    },
+    "findingHiddenInputContextEditableSurface": {
+        "message": "editable-surface",
+        "description": "Метка контекстной категории для hidden editable-surface controls"
+    },
+    "findingHiddenInputContextTextInput": {
+        "message": "text-input",
+        "description": "Метка контекстной категории для text-like hidden controls"
+    },
+    "findingHiddenInputConsentSignalChecked": {
+        "message": "checked",
+        "description": "Метка consent-сигнала, когда скрытый checkbox/radio помечен checked"
+    },
+    "findingHiddenInputConsentSignalRequired": {
+        "message": "required",
+        "description": "Метка consent-сигнала, когда скрытый control помечен required"
+    },
+    "findingHiddenInputConsentSignalNearbyConsentText": {
+        "message": "рядом текст согласия",
+        "description": "Метка consent-сигнала, когда nearby текст указывает на контекст согласия/политики"
+    },
+    "findingHiddenInputConsentSignalNone": {
+        "message": "нет",
+        "description": "Метка consent-сигнала, когда отдельные consent-признаки не найдены"
+    },
+    "findingHiddenInputConsentSignalVisibleReplacement": {
+        "message": "видимый заменитель",
+        "description": "Метка consent-сигнала, когда скрытый checkbox/radio имеет видимый кастомный заменитель"
+    },
+    "findingHiddenInputUploadSignalVisibleLabelTrigger": {
+        "message": "видимый label-триггер",
+        "description": "Метка upload-сигнала, когда скрытый file-input связан с видимым label-триггером"
+    },
+    "findingHiddenInputUploadSignalVisibleButtonTrigger": {
+        "message": "видимый button-триггер",
+        "description": "Метка upload-сигнала, когда скрытый file-input связан с видимым button-like триггером"
+    },
+    "findingHiddenInputUploadSignalAriaControlsTrigger": {
+        "message": "aria-controls триггер",
+        "description": "Метка upload-сигнала, когда скрытый file-input связан с видимым aria-controls триггером"
+    },
+    "findingHiddenInputUploadSignalMissingVisibleTrigger": {
+        "message": "нет видимого триггера",
+        "description": "Метка upload-сигнала, когда у скрытого file-input отсутствует видимый триггер"
+    },
+    "findingHiddenInputUploadSignalNone": {
+        "message": "нет",
+        "description": "Метка upload-сигнала, когда отдельные upload-признаки не найдены"
+    },
+    "findingHiddenInputContextSignalNone": {
+        "message": "нет",
+        "description": "Метка общего контекстного сигнала, когда специфические контекстные сигналы не найдены"
+    },
+    "findingHiddenInputInteractionFocusable": {
+        "message": "focusable",
+        "description": "Метка interaction-сигнала для скрытого контрола, который остаётся focusable"
+    },
+    "findingHiddenInputInteractionClickable": {
+        "message": "clickable",
+        "description": "Метка interaction-сигнала для скрытого контрола с активными pointer events"
+    },
+    "findingHiddenInputInteractionTabindex": {
+        "message": "tabindex",
+        "description": "Префикс interaction-сигнала для значения tabindex у скрытого контрола"
+    },
+    "findingHiddenInputInteractionDisabled": {
+        "message": "disabled",
+        "description": "Метка interaction-сигнала для состояния disabled у скрытого контрола"
+    },
+    "findingHiddenInputInteractionAriaHidden": {
+        "message": "aria-hidden",
+        "description": "Метка interaction-сигнала для атрибута aria-hidden у скрытого контрола"
+    },
+    "findingHiddenEditableContextRichTextEditor": {
+        "message": "rich-text-editor",
+        "description": "Категория editor-контекста для скрытой rich-text editable-поверхности"
+    },
+    "findingHiddenEditableContextPlainTextEditor": {
+        "message": "plain-text-editor",
+        "description": "Категория editor-контекста для скрытой plaintext-only editable-поверхности"
+    },
+    "findingHiddenEditableContextTextboxRole": {
+        "message": "textbox-role",
+        "description": "Категория editor-контекста для скрытой поверхности с role textbox"
+    },
+    "findingHiddenEditableContextFocusableEditable": {
+        "message": "focusable-editable",
+        "description": "Категория editor-контекста для скрытой focusable editable-поверхности"
+    },
+    "findingHiddenEditableSignalContentEditable": {
+        "message": "contenteditable",
+        "description": "Сигнал, когда скрытая editable-поверхность является contenteditable"
+    },
+    "findingHiddenEditableSignalPlaintextOnly": {
+        "message": "plaintext-only",
+        "description": "Сигнал, когда скрытая editable-поверхность использует contenteditable plaintext-only"
+    },
+    "findingHiddenEditableSignalRoleTextbox": {
+        "message": "role=textbox",
+        "description": "Сигнал, когда скрытая editable-поверхность имеет role textbox"
+    },
+    "findingHiddenEditableSignalAriaMultiline": {
+        "message": "aria-multiline",
+        "description": "Сигнал, когда скрытая editable-поверхность имеет aria-multiline=true"
+    },
+    "findingHiddenEditableSignalSpellcheck": {
+        "message": "spellcheck",
+        "description": "Сигнал, когда у скрытой editable-поверхности есть атрибут spellcheck"
+    },
+    "findingHiddenEditableSignalInputmode": {
+        "message": "inputmode",
+        "description": "Сигнал, когда у скрытой editable-поверхности есть атрибут inputmode"
+    },
+    "findingHiddenEditableSignalPromptLike": {
+        "message": "prompt-like marker",
+        "description": "Сигнал, когда скрытая editable-поверхность содержит prompt-like placeholder маркеры"
+    },
+    "findingHiddenEditableSignalMeaningfulText": {
+        "message": "meaningful text",
+        "description": "Сигнал, когда скрытая editable-поверхность содержит осмысленный текст"
+    },
+    "findingOverlaySummary": {
+        "message": "Возможен обманный overlay или слой перехвата кликов",
+        "description": "Сводка для детекта overlay"
+    },
+    "findingFullScreenOverlaySummary": {
+        "message": "Возможен полноэкранный overlay поверх содержимого страницы",
+        "description": "Сводка для детекта полноэкранного overlay"
+    },
+    "findingFullScreenOverlayDetails": {
+        "message": "$1 [coverage=$2; position=$3; z-index=$4; pointer-events=$5; markers=$6; context=$7; signals=$8]",
+        "description": "Детали для finding полноэкранного overlay с геометрией, CSS, маркерами, контекстом и сигналами"
+    },
+    "findingClickCaptureLayerSummary": {
+        "message": "Возможен слой перехвата кликов поверх интерактивной цели",
+        "description": "Сводка для детекта click-capture layer"
+    },
+    "findingClickCaptureLayerDetails": {
+        "message": "$1 [target=$2; targetElement=$3; point=$4; position=$5; z-index=$6; pointer-events=$7; opacity=$8; markers=$9; context=$10; signals=$11]",
+        "description": "Детали для finding click-capture layer с верхним слоем, нижележащей целью, точкой проверки, CSS и контекстом"
+    },
+    "findingSuspiciousStackingPatternSummary": {
+        "message": "Подозрительная многоуровневая stacking-комбинация вокруг элементов страницы",
+        "description": "Сводка для детекта suspicious stacking pattern"
+    },
+    "findingSuspiciousStackingPatternDetails": {
+        "message": "$1 [layers=$2; point=$3; reasons=$4; related=$5; layerStack=$6; context=$7]",
+        "description": "Детали для finding suspicious stacking pattern с количеством слоёв, точкой проверки, причинами, связанными findings, стеком слоёв и benign-контекстом"
+    },
+    "findingDeceptiveCaptureSummary": {
+        "message": "Возможна обманная интерактивная поверхность перехвата",
+        "description": "Сводка для детекта deceptive capture surface"
+    },
+    "findingDeceptiveCaptureIframeSummary": {
+        "message": "Возможна обманная iframe-поверхность перехвата",
+        "description": "Сводка для детекта deceptive iframe capture surface"
+    },
+    "findingDeceptiveCaptureDetails": {
+        "message": "$1 [type=$2; scope=$3; signals=$4; linkedContext=$5]",
+        "description": "Детали для deceptive capture finding с типом элемента, зоной, сигналами и контекстной связью"
+    },
+    "findingDeceptiveCaptureScopeLocal": {
+        "message": "local",
+        "description": "Метка локальной deceptive capture поверхности"
+    },
+    "findingDeceptiveCaptureScopeOverlayLike": {
+        "message": "overlay-like",
+        "description": "Метка overlay-like deceptive capture поверхности"
+    },
+    "findingDeceptiveCaptureSignalOpacity": {
+        "message": "opacity",
+        "description": "Сигнал deceptive capture через подавление opacity"
+    },
+    "findingDeceptiveCaptureSignalNearTransparent": {
+        "message": "near-transparent",
+        "description": "Сигнал deceptive capture через почти прозрачное состояние"
+    },
+    "findingDeceptiveCaptureSignalNoVisualMarker": {
+        "message": "no visual marker",
+        "description": "Сигнал deceptive capture без заметных текстовых/фоновых/бордерных маркеров"
+    },
+    "findingDeceptiveCaptureSignalSuppressionSupport": {
+        "message": "suppression-support",
+        "description": "Поддерживающий сигнал clipping/suppression контекста"
+    },
+    "findingDeceptiveCaptureSignalPointerEvents": {
+        "message": "pointer-events",
+        "description": "Сигнал активных pointer events для deceptive capture поверхности"
+    },
+    "findingDeceptiveCaptureSignalCursorPointer": {
+        "message": "cursor-pointer",
+        "description": "Сигнал pointer cursor для deceptive capture поверхности"
+    },
+    "findingDeceptiveCaptureSignalFocusable": {
+        "message": "focusable",
+        "description": "Сигнал focusable deceptive capture поверхности"
+    },
+    "findingDeceptiveCaptureSignalHighZIndex": {
+        "message": "high-z-index",
+        "description": "Сигнал высокого z-index для deceptive capture поверхности"
+    },
+    "findingDeceptiveCaptureSignalLargeArea": {
+        "message": "large-area",
+        "description": "Сигнал большой площади deceptive capture поверхности"
+    },
+    "findingDeceptiveCaptureSignalOverlayingUi": {
+        "message": "overlaying-ui",
+        "description": "Сигнал перекрытия видимого UI deceptive capture поверхностью"
+    },
+    "findingDeceptiveCaptureSignalLabelHiddenControl": {
+        "message": "label-hidden-control",
+        "description": "Сигнал label, связанного со скрытым consent/upload контролом"
+    },
+    "findingStyleObfuscationSummary": {
+        "message": "Возможна CSS-обфускация визуального отображения",
+        "description": "Сводка для детекта CSS-обфускации"
+    },
+    "findingClippingHidingSummary": {
+        "message": "Возможно скрытие содержимого через CSS clipping",
+        "description": "Сводка для детекта скрытия через CSS clipping"
+    },
+    "findingClippingHidingDetails": {
+        "message": "$1 [source=$2; sourceElement=$3; clipSource=$4; value=$5; reason=$6; context=$7; benign=$8; escalation=$9]",
+        "description": "Детали для finding скрытия через CSS clipping с источником, значением, причиной, контекстом содержимого, benign-контекстом и escalation-сигналами"
+    },
+    "findingTransformSuppressionSummary": {
+        "message": "Возможно скрытие содержимого через подавление transform scale",
+        "description": "Сводка для детекта подавления через transform scale"
+    },
+    "findingTransformSuppressionDetails": {
+        "message": "$1 [source=$2; sourceElement=$3; transformSource=$4; value=$5; reason=$6; scale=$7; context=$8; benign=$9; escalation=$10]",
+        "description": "Детали для finding transform suppression с источником, значением transform, нормализованным scale, контекстом содержимого, benign-контекстом и escalation-сигналами"
+    },
+    "findingFilterBlendManipulationSummary": {
+        "message": "Возможна манипуляция видимостью через CSS filter или blend mode",
+        "description": "Сводка для детекта манипуляции через filter или blend mode"
+    },
+    "findingFilterBlendManipulationDetails": {
+        "message": "$1 [source=$2; sourceElement=$3; effectSource=$4; value=$5; reason=$6; context=$7; benign=$8; escalation=$9]",
+        "description": "Детали для finding filter/blend manipulation с источником, значением эффекта, нормализованной причиной, контекстом содержимого, benign-контекстом и escalation-сигналами"
+    },
+    "findingSemanticVisibilityMismatchSummary": {
+        "message": "Видимое содержимое скрыто или нейтрализовано в семантическом accessibility-состоянии",
+        "description": "Сводка для детекта видимого semantic mismatch"
+    },
+    "findingSemanticVisibilityMismatchDetails": {
+        "message": "$1 [source=$2; sourceElement=$3; semanticSignal=$4; context=$5; visible=true; interaction=$6; benign=$7; escalation=$8]",
+        "description": "Детали для finding видимого semantic mismatch с семантическим источником, контекстом содержимого, interaction-состоянием, benign-контекстом и escalation-сигналами"
+    },
+    "findingUnsafeProtocolSummary": {
+        "message": "Возможен небезопасный протокол перехода",
+        "description": "Сводка для детекта небезопасного протокола"
+    },
+    "findingRedirectPatternSummary": {
+        "message": "Возможен redirect- или bounce-паттерн URL",
+        "description": "Сводка для детекта redirect-паттерна"
+    },
+    "findingLinkMismatchSummary": {
+        "message": "Видимый текст ссылки отличается от фактического домена назначения",
+        "description": "Сводка для детекта несовпадения текста ссылки и назначения"
+    },
+    "findingHostnameMixedPunycodeSummary": {
+        "message": "Смешанный алфавит в hostname с сегментом punycode",
+        "description": "Сводка для детекта смешанного алфавита с punycode в hostname"
+    },
+    "findingHostnameMixedScriptSummary": {
+        "message": "Смешанный алфавит в hostname может указывать на гомографическую подмену",
+        "description": "Сводка для детекта смешанного алфавита в hostname"
+    },
+    "findingHostnamePunycodeSummary": {
+        "message": "Hostname в punycode требует проверки",
+        "description": "Сводка для детекта punycode в hostname"
+    },
+    "findingApiSurfaceSummary": {
+        "message": "Обнаружена потенциальная поверхность взаимодействия страницы с API",
+        "description": "Сводка для детекта API-поверхности"
+    },
+    "findingApiSurfaceDetails": {
+        "message": "$1: $2",
+        "description": "Детали для детекта API-поверхности"
+    },
+    "findingPromptSplittingSummary": {
+        "message": "Обнаружены потенциальные фрагменты разделённого промпта",
+        "description": "Сводка для детекта разделения промпта"
+    },
+    "findingTriggerPhraseSummary": {
+        "message": "Обнаружен потенциальный фрагмент триггерной фразы",
+        "description": "Сводка для детекта триггерной фразы"
+    },
+    "hiddenTextDisplayMode": {
+        "message": "Режим детекции display:none:",
+        "description": "Настройка режима детекции display none"
+    },
+    "hiddenTextDisplayModeAncestors": {
+        "message": "Режим A (по умолчанию): элемент + предки (выше покрытие)",
+        "description": "Опция режима A для display none"
+    },
+    "hiddenTextDisplayModeSelf": {
+        "message": "Режим B: только элемент (меньше ложных срабатываний)",
+        "description": "Опция режима B для display none"
+    },
+    "visualManipulationDesc": {
+        "message": "Выявляет скрытый текст, скрытые поля ввода, обманные overlay и CSS-манипуляции видимостью",
+        "description": "Описание модуля визуальных манипуляций"
+    },
+    "caseSensitive": {
+        "message": "Учитывать регистр",
+        "description": "Настройка чувствительности к регистру"
+    },
+    "detectionThreshold": {
+        "message": "Порог обнаружения",
+        "description": "Настройка порога обнаружения"
+    },
+    "detectHiddenInputs": {
+        "message": "Выявлять скрытые поля ввода",
+        "description": "Настройка выявления скрытых полей ввода"
+    },
+    "detectDeceptiveCapture": {
+        "message": "Выявлять обманные интерактивные поверхности",
+        "description": "Настройка выявления deceptive capture поверхностей"
+    },
+    "detectUnsafeProtocols": {
+        "message": "Выявлять небезопасные протоколы",
+        "description": "Настройка выявления небезопасных протоколов"
+    },
+    "linkDomainSecurityDesc": {
+        "message": "Анализирует ссылки, домены, редиректы, гомографы и небезопасные протоколы",
+        "description": "Описание модуля безопасности ссылок и доменов"
+    },
+    "visualManipulationName": {
+        "message": "Скрытый контент и визуальные манипуляции",
+        "description": "Название модуля визуальных манипуляций"
+    },
+    "linkDomainSecurityName": {
+        "message": "Безопасность ссылок и доменов",
+        "description": "Название модуля безопасности ссылок и доменов"
+    },
+    "linkDomainSecurity": {
+        "message": "Безопасность ссылок и доменов",
+        "description": "Метка модуля безопасности ссылок и доменов"
+    },
+    "toggleMenu": {
+        "message": "Переключить меню",
+        "description": "Подпись для кнопки мобильного меню"
+    },
+    "optionsInitError": {
+        "message": "Не удалось инициализировать страницу настроек",
+        "description": "Ошибка инициализации страницы настроек"
+    },
+    "defaultConfigLoadWarning": {
+        "message": "Загружена конфигурация по умолчанию, так как сохранённые настройки не удалось прочитать",
+        "description": "Предупреждение о переходе на конфигурацию по умолчанию"
+    },
+    "settingsExported": {
+        "message": "Настройки успешно экспортированы",
+        "description": "Сообщение об успешном экспорте настроек"
+    },
+    "exportError": {
+        "message": "Не удалось экспортировать настройки",
+        "description": "Ошибка экспорта настроек"
+    },
+    "settingsImported": {
+        "message": "Настройки успешно импортированы",
+        "description": "Сообщение об успешном импорте настроек"
+    },
+    "importError": {
+        "message": "Не удалось импортировать настройки",
+        "description": "Ошибка импорта настроек"
+    },
+    "invalidConfigFile": {
+        "message": "Некорректный файл конфигурации",
+        "description": "Сообщение о некорректном файле конфигурации"
+    },
+    "globalErrorTitle": {
+        "message": "Ошибка",
+        "description": "Заголовок глобальной ошибки"
+    },
+    "popupInitError": {
+        "message": "Не удалось инициализировать всплывающее окно",
+        "description": "Ошибка инициализации всплывающего окна"
+    },
+    "pageNotScannable": {
+        "message": "Эту страницу нельзя сканировать",
+        "description": "Сообщение о недоступности сканирования страницы"
+    },
+    "loading": {
+        "message": "Загрузка...",
+        "description": "Плейсхолдер загрузки"
+    },
+    "securityScorePlaceholder": {
+        "message": "Оценка: 95/100",
+        "description": "Плейсхолдер оценки безопасности"
+    },
+    "helpPageTitle": {
+        "message": "Справка PageCheck",
+        "description": "Заголовок страницы справки"
+    },
+    "helpPageIntro": {
+        "message": "Этот раздел справки пока доступен как заглушка и будет расширен перед релизом.",
+        "description": "Вступление страницы справки"
+    },
+    "helpPageStubTitle": {
+        "message": "Текущее состояние",
+        "description": "Заголовок секции заглушки справки"
+    },
+    "helpPageStub": {
+        "message": "Страница уже работает как точка перехода из popup и хранит базовую структуру для будущей пользовательской справки.",
+        "description": "Основной текст заглушки справки"
+    },
+    "plannedNextTitle": {
+        "message": "Что будет дальше",
+        "description": "Заголовок секции с дальнейшими планами"
+    },
+    "helpPlannedItem1": {
+        "message": "Описание модулей и практические примеры.",
+        "description": "Первый пункт будущей справки"
+    },
+    "helpPlannedItem2": {
+        "message": "Пояснение результатов сканирования и статусов.",
+        "description": "Второй пункт будущей справки"
+    },
+    "helpPlannedItem3": {
+        "message": "Руководство по устранению проблем и FAQ.",
+        "description": "Третий пункт будущей справки"
+    },
+    "aboutPageTitle": {
+        "message": "О PageCheck",
+        "description": "Заголовок страницы о расширении"
+    },
+    "aboutPageIntro": {
+        "message": "Эта страница пока служит заглушкой для информации о релизе, контекста проекта и метаданных расширения.",
+        "description": "Вступление страницы о расширении"
+    },
+    "aboutPageStubTitle": {
+        "message": "Текущее состояние",
+        "description": "Заголовок секции заглушки about"
+    },
+    "aboutPageStub": {
+        "message": "Страница уже открывается из popup и позже может быть расширена до полноценного экрана о релизе и расширении.",
+        "description": "Основной текст заглушки about"
+    },
+    "currentVersionLabel": {
+        "message": "Текущая версия",
+        "description": "Подпись текущей версии"
+    },
+    "aboutStatusLabel": {
+        "message": "Статус",
+        "description": "Подпись статуса"
+    },
+    "aboutStatusValue": {
+        "message": "MVP-заглушка",
+        "description": "Значение статуса для страницы about"
+    },
+    "findingCssBidiPresentationSummary": {
+        "message": "CSS bidi-override может изменить воспринимаемый порядок текста",
+        "description": "Краткое описание подозрительного CSS bidi-представления текста"
+    },
+    "findingCssBidiPresentationDetails": {
+        "message": "$1 [direction=$2; unicode-bidi=$3; context=$4; supporting=$5]",
+        "description": "Детали подозрительного CSS bidi-представления текста"
+    },
+    "findingPseudoContentSubstitutionSummary": {
+        "message": "Сгенерированный CSS-контент может заменять видимую подпись",
+        "description": "Краткое описание подмены через pseudo-content"
+    },
+    "findingPseudoContentSubstitutionDetails": {
+        "message": "$1 [source=$2; reason=$3; context=$4; supporting=$5]",
+        "description": "Детали подмены через pseudo-content"
+    },
+    "findingCssTextMaskingSummary": {
+        "message": "CSS-маскирование текста скрывает отображаемый текст",
+        "description": "Краткое описание CSS-маскирования текста"
+    },
+    "findingHostnameCurrentDetails": {
+        "message": "Hostname текущей страницы: $1",
+        "description": "Детали finding для hostname текущей страницы"
+    },
+    "findingHostnameTargetDetails": {
+        "message": "Hostname назначения: $1; $2",
+        "description": "Детали finding для hostname назначения"
+    },
+    "findingUnsafeProtocolDetails": {
+        "message": "Протокол: $1; $2",
+        "description": "Детали finding для небезопасного протокола перехода"
+    },
+    "findingRedirectPatternDetails": {
+        "message": "Параметр redirect: $1; hostname назначения: $2; $3",
+        "description": "Детали finding для redirect-паттерна"
+    },
+    "findingLinkMismatchDetails": {
+        "message": "Видимый hostname: $1; hostname назначения: $2; $3",
+        "description": "Детали finding для несовпадения видимого текста ссылки"
+    },
+    "apiPermissionRequired": {
+        "message": "API Interception требует разрешение HTTP/HTTPS для включения наблюдения.",
+        "description": "Показывается, когда для перехвата API требуется optional-разрешение HTTP и HTTPS"
+    },
+    "apiPermissionDenied": {
+        "message": "Разрешение не предоставлено. API Interception остаётся выключенным.",
+        "description": "Показывается, когда пользователь отклоняет запрос разрешения для перехвата API"
+    },
+    "apiPermissionUnavailable": {
+        "message": "API разрешений недоступен. API Interception остаётся выключенным.",
+        "description": "Показывается, когда API разрешений браузера недоступен"
+    },
+    "apiPermissionRemovalFailed": {
+        "message": "API Interception выключен, но удалить разрешение не удалось.",
+        "description": "Показывается, когда выключение успешно, но удалить разрешение браузера не удалось"
+    },
+    "findingCssTextMaskingDetails": {
+        "message": "$1 [text-security=$2; reason=masked-text; context=$3; supporting=$4]",
+        "description": "Детали CSS-маскирования текста"
+    },
+    "findingsApiSettings": {
+        "message": "Findings API",
+        "description": "Заголовок раздела настроек findings API"
+    },
+    "findingsApiWarning": {
+        "message": "По умолчанию выключено. Если включить, перечисленные расширения смогут читать находки PageCheck на странице, которую вы смотрите. Скриптам страницы этот канал недоступен.",
+        "description": "Предупреждение о приватности для findings API"
+    },
+    "findingsApiEnabledLabel": {
+        "message": "Передавать находки расширениям",
+        "description": "Подпись переключателя findings API"
+    },
+    "findingsApiAllowlistLabel": {
+        "message": "Разрешённые ID расширений",
+        "description": "Подпись поля со списком разрешённых расширений"
+    },
+    "findingsApiAllowlistHint": {
+        "message": "ID из 32 символов через запятую. Пустой список не передаёт находки никому, даже если переключатель выше включён.",
+        "description": "Подсказка к полю со списком разрешённых расширений"
+    }
+}

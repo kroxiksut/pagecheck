@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PageCheck link-domain-security manual test page</title>
+</head>
+<body>
+  <h1>PageCheck link-domain-security manual test page</h1>
+
+  <h2>Hostname signals</h2>
+  <p><a href="https://xn--exmple-4nf.com/path">Punycode target with decoded mixed script</a></p>
+  <p><a href="https://exаmple.com/path">Unicode mixed-script target</a></p>
+  <p><a href="https://xn--bcher-kva.example/path">Benign punycode target</a></p>
+
+  <h2>Unsafe protocols</h2>
+  <p><a href="javascript:alert('PageCheck test')">javascript protocol</a></p>
+  <p><a href="data:text/html,PageCheck%20test">data protocol</a></p>
+  <p><a href="file:///C:/Windows/System32/drivers/etc/hosts">file protocol</a></p>
+  <p><a href="mailto:test@example.com">mailto allowed protocol</a></p>
+  <p><a href="tel:+10000000000">tel allowed protocol</a></p>
+
+  <h2>Redirect patterns</h2>
+  <p><a href="https://redirector.example/go?url=https%3A%2F%2Fevil.example%2Flanding">External redirect via url</a></p>
+  <p><a href="https://redirector.example/go?redirect=https%3A%2F%2Fevil.example%2Flanding">External redirect via redirect</a></p>
+  <p><a href="https://redirector.example/go?next=%2Faccount">Same-host relative redirect</a></p>
+  <p><a href="https://redirector.example/go?redirect_url=https%3A%2F%2Fevil.example%2Flanding">Partial redirect key should be ignored</a></p>
+  <p><a href="https://redirector.example/go?continue=opaque-token">Unknown redirect destination should be ignored</a></p>
+
+  <h2>Visible target mismatch</h2>
+  <p><a href="https://evil.example/login">example.com</a></p>
+  <p><a href="https://login.example.com/login">example.com</a></p>
+  <p><a href="https://example.com/login">www.example.com</a></p>
+  <p><a href="https://evil.example/login">Go to example.com</a></p>
+  <p><a href="https://xn--exmple-4nf.com/login">exаmple.com</a></p>
+
+  <h2>Forms</h2>
+  <form action="https://redirector.example/form?url=https%3A%2F%2Fevil.example%2Fsubmit" method="post">
+    <button type="submit">External redirect form</button>
+  </form>
+  <form action="/local-submit" method="post">
+    <button type="submit">Local form</button>
+  </form>
+
+  <h2>Benign cases</h2>
+  <p><a href="/relative-page">Relative internal link</a></p>
+  <p><a href="#section">Internal anchor</a></p>
+  <p><a href="https://example.com/about">Visit our official site</a></p>
+</body>
+</html>

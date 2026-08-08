@@ -1,0 +1,79 @@
+﻿<!-- ui/components/theme-switcher.html -->
+<div class="theme-switcher">
+    <div class="theme-header">
+        <h3 data-i18n="themeSettings">Theme Settings</h3>
+        <span class="theme-current" data-i18n="currentTheme">Current: System</span>
+    </div>
+
+    <div class="theme-options">
+        <label class="theme-option" data-theme="auto">
+            <input type="radio" name="theme" value="auto" class="theme-radio">
+            <div class="theme-card">
+                <div class="theme-preview auto-preview">
+                    <div class="preview-half light-half"></div>
+                    <div class="preview-half dark-half"></div>
+                    <div class="preview-icon">&#9681;</div>
+                </div>
+                <div class="theme-info">
+                    <span class="theme-name" data-i18n="autoTheme">Auto (System)</span>
+                    <span class="theme-description" data-i18n="autoThemeDesc">
+                        Follows your system theme
+                    </span>
+                </div>
+            </div>
+        </label>
+
+        <label class="theme-option" data-theme="light">
+            <input type="radio" name="theme" value="light" class="theme-radio">
+            <div class="theme-card">
+                <div class="theme-preview light-preview">
+                    <div class="preview-icon">&#9728;</div>
+                </div>
+                <div class="theme-info">
+                    <span class="theme-name" data-i18n="lightTheme">Light</span>
+                    <span class="theme-description" data-i18n="lightThemeDesc">
+                        Clean and bright interface
+                    </span>
+                </div>
+            </div>
+        </label>
+
+        <label class="theme-option" data-theme="dark">
+            <input type="radio" name="theme" value="dark" class="theme-radio">
+            <div class="theme-card">
+                <div class="theme-preview dark-preview">
+                    <div class="preview-icon">&#127769;</div>
+                </div>
+                <div class="theme-info">
+                    <span class="theme-name" data-i18n="darkTheme">Dark</span>
+                    <span class="theme-description" data-i18n="darkThemeDesc">
+                        Easy on the eyes
+                    </span>
+                </div>
+            </div>
+        </label>
+    </div>
+
+    <div class="theme-advanced">
+        <button class="advanced-toggle" data-i18n="advancedSettings" aria-expanded="false" type="button">
+            Advanced Settings
+        </button>
+
+        <div class="advanced-content" hidden>
+            <div class="setting-row">
+                <label>
+                    <input type="checkbox" id="theme-persistence">
+                    <span data-i18n="rememberTheme">Remember theme choice</span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <label data-i18n="animationSpeed">Animation speed:</label>
+                <select id="animation-speed">
+                    <option value="fast" data-i18n="fast">Fast</option>
+                    <option value="normal" data-i18n="normal" selected>Normal</option>
+                    <option value="slow" data-i18n="slow">Slow</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>

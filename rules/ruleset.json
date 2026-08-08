@@ -1,0 +1,181 @@
+﻿[
+    {
+        "id":  1,
+        "priority":  1,
+        "action":  {
+                       "type":  "block"
+                   },
+        "condition":  {
+                          "urlFilter":  "||malicious-domain.com^",
+                          "resourceTypes":  [
+                                                "main_frame",
+                                                "sub_frame",
+                                                "stylesheet",
+                                                "script",
+                                                "image",
+                                                "font",
+                                                "object",
+                                                "xmlhttprequest",
+                                                "ping",
+                                                "csp_report",
+                                                "media",
+                                                "websocket",
+                                                "webtransport",
+                                                "webbundle",
+                                                "other"
+                                            ]
+                      },
+        "description":  "Block known malicious domain"
+    },
+    {
+        "id":  2,
+        "priority":  1,
+        "action":  {
+                       "type":  "block"
+                   },
+        "condition":  {
+                          "urlFilter":  "||phishing-site.com^",
+                          "resourceTypes":  [
+                                                "main_frame",
+                                                "sub_frame"
+                                            ]
+                      },
+        "description":  "Block phishing sites"
+    },
+    {
+        "id":  3,
+        "priority":  2,
+        "action":  {
+                       "type":  "block"
+                   },
+        "condition":  {
+                          "urlFilter":  "|https?://[^/]+/malicious-script.js|",
+                          "resourceTypes":  [
+                                                "script"
+                                            ]
+                      },
+        "description":  "Block specific malicious scripts"
+    },
+    {
+        "id":  4,
+        "priority":  2,
+        "action":  {
+                       "type":  "block"
+                   },
+        "condition":  {
+                          "urlFilter":  "|https?://[^/]+/tracker.js|",
+                          "resourceTypes":  [
+                                                "script",
+                                                "xmlhttprequest"
+                                            ]
+                      },
+        "description":  "Block tracking scripts"
+    },
+    {
+        "id":  5,
+        "priority":  3,
+        "action":  {
+                       "type":  "redirect",
+                       "redirect":  {
+                                        "extensionPath":  "/assets/blocked.html"
+                                    }
+                   },
+        "condition":  {
+                          "urlFilter":  "||ad-server.com^",
+                          "resourceTypes":  [
+                                                "image",
+                                                "script",
+                                                "xmlhttprequest"
+                                            ]
+                      },
+        "description":  "Redirect ad requests to blocked page"
+    },
+    {
+        "id":  6,
+        "priority":  1,
+        "action":  {
+                       "type":  "modifyHeaders",
+                       "requestHeaders":  [
+                                              {
+                                                  "header":  "X-Frame-Options",
+                                                  "operation":  "set",
+                                                  "value":  "DENY"
+                                              }
+                                          ]
+                   },
+        "condition":  {
+                          "urlFilter":  "*",
+                          "resourceTypes":  [
+                                                "main_frame",
+                                                "sub_frame"
+                                            ]
+                      },
+        "description":  "Set X-Frame-Options to prevent clickjacking"
+    },
+    {
+        "id":  7,
+        "priority":  2,
+        "action":  {
+                       "type":  "modifyHeaders",
+                       "responseHeaders":  [
+                                               {
+                                                   "header":  "Content-Security-Policy",
+                                                   "operation":  "append",
+                                                   "value":  "default-src \u0027self\u0027; script-src \u0027self\u0027 \u0027unsafe-inline\u0027"
+                                               }
+                                           ]
+                   },
+        "condition":  {
+                          "urlFilter":  "|https?://your-site.com|",
+                          "resourceTypes":  [
+                                                "main_frame"
+                                            ]
+                      },
+        "description":  "Add CSP header for specific site"
+    },
+    {
+        "id":  8,
+        "priority":  1,
+        "action":  {
+                       "type":  "block"
+                   },
+        "condition":  {
+                          "regexFilter":  "(password|token|key|secret)=[^\u0026]*",
+                          "resourceTypes":  [
+                                                "xmlhttprequest",
+                                                "websocket"
+                                            ]
+                      },
+        "description":  "Block requests with sensitive data in URL"
+    },
+    {
+        "id":  9,
+        "priority":  2,
+        "action":  {
+                       "type":  "block"
+                   },
+        "condition":  {
+                          "urlFilter":  "data:text/html,*javascript:*",
+                          "resourceTypes":  [
+                                                "main_frame",
+                                                "sub_frame"
+                                            ]
+                      },
+        "description":  "Block data URLs with JavaScript"
+    },
+    {
+        "id":  10,
+        "priority":  1,
+        "action":  {
+                       "type":  "allow"
+                   },
+        "condition":  {
+                          "urlFilter":  "||google.com^",
+                          "resourceTypes":  [
+                                                "xmlhttprequest",
+                                                "websocket"
+                                            ]
+                      },
+        "description":  "Allow requests to Google APIs"
+    }
+]

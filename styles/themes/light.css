@@ -1,0 +1,23 @@
+/* styles/themes/light.css */
+.pagecheck-theme-light {
+    --primary-color: #1a73e8;
+    --primary-hover: #1967d2;
+    --background: #ffffff;
+    --surface: #f8f9fa;
+    --text-primary: #202124;
+    --text-secondary: #5f6368;
+    --border: #dadce0;
+    --error: #d93025;
+    --success: #137333;
+    --warning: #f29900;
+}
+
+.pagecheck-theme-light body {
+    background-color: var(--background);
+    color: var(--text-primary);
+}
+
+.pagecheck-theme-light .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+}

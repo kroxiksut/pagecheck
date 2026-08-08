@@ -1,0 +1,77 @@
+<div class="module-card" data-module="MODULE_ID">
+    <div class="module-header">
+        <div class="module-info">
+            <div class="module-icon" data-icon="PC"></div>
+            <div class="module-title">
+                <h3 data-i18n="moduleName">Module Name</h3>
+                <div class="module-status">
+                    <span class="status-badge" data-status="inactive" data-i18n="inactive">Inactive</span>
+                    <span class="last-scan" data-i18n="lastScan">Last scan: Never</span>
+                </div>
+            </div>
+        </div>
+
+        <label class="switch">
+            <input type="checkbox" data-setting="enabled" class="module-toggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <div class="module-content">
+        <p class="module-description" data-i18n="moduleDescription">
+            Module description goes here. This module provides security scanning
+            and protection against various threats.
+        </p>
+
+        <div class="module-stats">
+            <div class="stat-item">
+                <span class="stat-value" data-stat="elementsScanned">0</span>
+                <span class="stat-label" data-i18n="elementsScanned">Elements scanned</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" data-stat="threatsDetected">0</span>
+                <span class="stat-label" data-i18n="threatsDetected">Threats detected</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" data-stat="lastScanTime">0ms</span>
+                <span class="stat-label" data-i18n="lastScanTime">Last scan time</span>
+            </div>
+        </div>
+
+        <div class="module-actions">
+            <button class="action-btn scan-now-btn" data-action="scanNow" data-i18n="scanNow">
+                Scan Now
+            </button>
+            <button class="action-btn test-btn" data-action="testModule" data-i18n="testModule">
+                Test
+            </button>
+        </div>
+    </div>
+
+    <div class="module-settings" hidden>
+        <div class="settings-header">
+            <h4 data-i18n="moduleSettings">Module Settings</h4>
+            <button class="settings-close" data-action="closeSettings" aria-label="Close settings">
+                X
+            </button>
+        </div>
+
+        <div class="settings-content">
+            <div class="module-settings-groups"></div>
+        </div>
+
+        <div class="settings-actions">
+            <button class="btn-secondary" data-action="resetSettings" data-i18n="resetToDefault">
+                Reset to Default
+            </button>
+            <button class="btn-primary" data-action="saveSettings" data-i18n="saveSettings">
+                Save Settings
+            </button>
+        </div>
+    </div>
+
+    <button class="settings-toggle" type="button">
+        <span class="toggle-text">Show Settings</span>
+        <span class="toggle-icon">v</span>
+    </button>
+</div>

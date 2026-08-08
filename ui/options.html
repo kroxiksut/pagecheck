@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="optionsTitle">PageCheck: Settings</title>
+
+    <!-- Theme styles -->
+    <link rel="stylesheet" href="../styles/themes/light.css" id="light-theme" disabled>
+    <link rel="stylesheet" href="../styles/themes/dark.css" id="dark-theme" disabled>
+
+    <!-- Base styles -->
+    <link rel="stylesheet" href="../styles/options.css">
+
+    <!-- Component styles -->
+    <link rel="stylesheet" href="../styles/components/header.css">
+    <link rel="stylesheet" href="../styles/components/theme-switcher.css">
+    <link rel="stylesheet" href="../styles/components/module-card.css">
+</head>
+<body>
+<div id="header-container"></div>
+
+<div class="main-container">
+    <div id="content-container">
+        <section class="welcome-section">
+            <div class="welcome-content">
+                <h1 data-i18n="optionsTitle">PageCheck Settings</h1>
+                <p data-i18n="welcomeDescription">
+                    Configure your security scanner settings and modules
+                </p>
+            </div>
+        </section>
+
+        <div class="settings-grid">
+            <div class="settings-column">
+                <section class="settings-section">
+                    <div class="section-header">
+                        <h2 data-i18n="languageSettings">Language Settings</h2>
+                    </div>
+
+                    <div class="setting-row">
+                        <label data-i18n="selectLanguage">Select Language:</label>
+                        <select id="language-select">
+                            <option value="auto" data-i18n="autoLanguage">Auto (Browser Language)</option>
+                            <option value="en">English</option>
+                            <option value="ru">Русский</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="settings-section">
+                    <div class="section-header">
+                        <h2 data-i18n="appearanceSettings">Appearance Settings</h2>
+                    </div>
+
+                    <div id="theme-container"></div>
+                </section>
+
+                <section class="settings-section">
+                    <div class="section-header">
+                        <h2 data-i18n="findingsApiSettings">Findings API</h2>
+                    </div>
+
+                    <p data-i18n="findingsApiWarning">
+                        Off by default. When enabled, listed extensions can read what PageCheck found on the page you are viewing.
+                    </p>
+
+                    <div class="setting-row">
+                        <label for="findings-api-enabled" data-i18n="findingsApiEnabledLabel">Share findings with extensions</label>
+                        <input type="checkbox" id="findings-api-enabled">
+                    </div>
+
+                    <div class="setting-row">
+                        <label for="findings-api-allowlist" data-i18n="findingsApiAllowlistLabel">Allowed extension IDs</label>
+                        <input type="text" id="findings-api-allowlist" autocomplete="off" spellcheck="false">
+                    </div>
+
+                    <p data-i18n="findingsApiAllowlistHint">
+                        Comma-separated. An empty list shares with nobody, even when the switch above is on.
+                    </p>
+                </section>
+            </div>
+
+            <div class="settings-column">
+                <section class="settings-section">
+                    <div class="section-header">
+                        <h2 data-i18n="moduleSettings">Module Settings</h2>
+                        <button class="section-action" id="toggle-all-modules" data-i18n="toggleAll">
+                            Toggle All
+                        </button>
+                    </div>
+
+                    <div id="modules-container" class="module-list">
+                        <div class="modules-loading">
+                            <span data-i18n="loadingModules">Loading modules...</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <div class="global-actions">
+            <div class="actions-group">
+                <button id="save-btn" class="btn-primary" data-i18n="saveSettings">
+                    Save Settings
+                </button>
+                <button id="reset-btn" class="btn-secondary" data-i18n="resetSettings">
+                    Reset to Default
+                </button>
+            </div>
+
+            <div class="actions-group">
+                <button id="export-btn" class="btn-outline" data-i18n="exportSettings">
+                    Export Settings
+                </button>
+                <button id="import-btn" class="btn-outline" data-i18n="importSettings">
+                    Import Settings
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="notifications-container"></div>
+
+<script type="module" src="../js/options.js"></script>
+</body>
+</html>

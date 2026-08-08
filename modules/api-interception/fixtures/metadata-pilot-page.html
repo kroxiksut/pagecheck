@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>PageCheck metadata pilot fixture</title>
+</head>
+<body>
+    <h1>Local metadata pilot fixture</h1>
+    <p>No external resources are loaded by this page.</p>
+    <button data-route="/image/png" type="button">Image PNG</button>
+    <button data-route="/image/document" type="button">Image document MIME</button>
+    <button data-route="/image/script" type="button">Image script MIME</button>
+    <button data-route="/api/xhr" type="button">XHR control</button>
+    <button data-route="/redirect/image" type="button">Redirect</button>
+    <button data-route="/burst" type="button">Burst</button>
+    <iframe src="/frame" title="Subframe must remain excluded"></iframe>
+    <output id="result" aria-live="polite"></output>
+    <script>
+        const output = document.getElementById('result');
+        document.querySelectorAll('button[data-route]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                try {
+                    const response = await fetch(button.dataset.route);
+                    output.textContent = String(response.status);
+                } catch {
+                    output.textContent = 'error';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

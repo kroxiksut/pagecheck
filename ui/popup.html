@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="extName">PageCheck: Security Scanner</title>
+
+    <!-- Theme styles -->
+    <link rel="stylesheet" href="../styles/themes/light.css" id="light-theme" disabled>
+    <link rel="stylesheet" href="../styles/themes/dark.css" id="dark-theme" disabled>
+
+    <!-- Base styles -->
+    <link rel="stylesheet" href="../styles/popup.css">
+    <link rel="stylesheet" href="../styles/components/header.css">
+</head>
+<body>
+<div class="popup-container">
+    <div class="popup-header">
+        <div class="header-brand">
+            <img src="../assets/icons/icon-32.png" alt="PageCheck Logo"
+                 class="header-logo" data-i18n-alt="logoAlt">
+            <div class="header-text">
+                <h2 data-i18n="extName">PageCheck</h2>
+                <span class="status-badge" data-status="active" data-i18n="active">Active</span>
+            </div>
+        </div>
+        <button class="settings-btn" data-i18n-title="openSettings" title="Open Settings" type="button">
+            &#9881;
+        </button>
+    </div>
+
+    <div class="quick-scan-section">
+        <button id="quick-scan-btn" class="scan-btn" data-i18n="scanPage" type="button">
+            Scan This Page
+        </button>
+        <div class="scan-stats">
+            <span class="stat" data-i18n="threatsBlocked">Threats blocked: 0</span>
+            <span class="stat" data-i18n="lastScan">Last scan: Never</span>
+        </div>
+    </div>
+
+    <div class="modules-status">
+        <h3 data-i18n="activeModules">Active Modules</h3>
+        <div class="modules-list">
+            <div class="module-status" data-module="Hidden-Content-Visual-Manipulation">
+                <span class="module-name" data-i18n="visualManipulation">Hidden Content &amp; Visual Manipulation</span>
+                <span class="module-state active" data-i18n="active">Active</span>
+            </div>
+            <div class="module-status" data-module="Link-Domain-Security">
+                <span class="module-name" data-i18n="linkDomainSecurity">Link &amp; Domain Security</span>
+                <span class="module-state inactive" data-i18n="inactive">Inactive</span>
+            </div>
+            <div class="module-status" data-module="Trigger-Phrases">
+                <span class="module-name" data-i18n="triggerPhrases">Trigger Phrases</span>
+                <span class="module-state active" data-i18n="active">Active</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="quick-actions">
+        <h3 data-i18n="quickActions">Quick Actions</h3>
+        <div class="action-buttons">
+            <button class="action-btn" data-action="enableAll" data-i18n="enableAll" type="button">
+                Enable All
+            </button>
+            <button class="action-btn" data-action="disableAll" data-i18n="disableAll" type="button">
+                Disable All
+            </button>
+            <button class="action-btn" data-action="viewReport" data-i18n="viewReport" type="button">
+                View Report
+            </button>
+        </div>
+    </div>
+
+    <div class="page-status">
+        <h3 data-i18n="currentPage">Current Page</h3>
+        <div class="page-info">
+            <span class="page-url" id="current-page-url" data-i18n="loading">Loading...</span>
+            <div class="page-security">
+                <span class="security-status safe" data-i18n="statusSafe">Safe</span>
+                <span class="security-score" data-i18n="securityScorePlaceholder">Score: 95/100</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="popup-footer">
+        <div class="footer-links">
+            <a href="#" data-i18n="settings" data-page="settings">Settings</a>
+            <a href="#" data-i18n="help" data-page="help">Help</a>
+            <a href="#" data-i18n="about" data-page="about">About</a>
+        </div>
+        <div class="footer-version">
+            v<span id="version-number">0.0.1-pre-alpha</span>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="../js/popup.js"></script>
+</body>
+</html>
+
+

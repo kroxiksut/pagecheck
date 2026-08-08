@@ -1,0 +1,118 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "description": "__MSG_extDescription__",
+  "version": "0.0.1",
+  "version_name": "0.0.1-pre-alpha",
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "96": "assets/icons/icon-96.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "default_locale": "en",
+  "action": {
+    "default_title": "__MSG_extName__",
+    "default_popup": "ui/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "declarativeNetRequest",
+    "webNavigation",
+    "notifications",
+    "tabs",
+    "declarativeContent"
+  ],
+  "optional_permissions": [
+    "webRequest"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "js/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "js/content.js"
+      ],
+      "css": [
+        "styles/content.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "styles/themes/light.css",
+        "styles/themes/dark.css",
+        "styles/content.css",
+        "ui/components/header.html",
+        "ui/components/module-card.html",
+        "ui/components/theme-switcher.html",
+        "assets/blocked.html",
+        "assets/icons/*.png",
+        "rules/ruleset.json",
+        "assets/images/*",
+        "utils/*.js",
+        "modules/ModuleCore.js",
+        "modules/*/*.js",
+        "modules/*/*/*.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "js/content.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "options_page": "ui/options.html",
+  "options_ui": {
+    "page": "ui/options.html",
+    "open_in_tab": true,
+    "browser_style": false
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules/ruleset.json"
+      }
+    ]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "minimum_chrome_version": "88",
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
+      },
+      "description": "Open PageCheck popup"
+    }
+  }
+}

@@ -1,0 +1,1322 @@
+﻿{
+    "extName": {
+        "message": "PageCheck: Security Scanner for Hidden Elements & Prompts",
+        "description": "The name of the extension"
+    },
+    "extShortName": {
+        "message": "PageCheck: Security Scanner",
+        "description": "The short name of the extension"
+    },
+    "extDescription": {
+        "message": "Local page analysis: hidden text, deceptive layers, prompt fragments. A signal source, not a full defence.",
+        "description": "The description of the extension"
+    },
+    "logoAlt": {
+        "message": "PageCheck Logo",
+        "description": "Alt text for logo"
+    },
+    "optionsTitle": {
+        "message": "PageCheck Settings",
+        "description": "Options page title"
+    },
+    "welcomeDescription": {
+        "message": "Configure your security scanner settings and modules",
+        "description": "Welcome description on options page"
+    },
+    "languageSettings": {
+        "message": "Language Settings",
+        "description": "Language settings section"
+    },
+    "appearanceSettings": {
+        "message": "Appearance Settings",
+        "description": "Appearance settings section"
+    },
+    "moduleSettings": {
+        "message": "Module Settings",
+        "description": "Module settings section"
+    },
+    "selectLanguage": {
+        "message": "Select Language:",
+        "description": "Language select label"
+    },
+    "autoLanguage": {
+        "message": "Auto (Browser Language)",
+        "description": "Auto language option"
+    },
+    "themeSettings": {
+        "message": "Theme Settings",
+        "description": "Theme settings section"
+    },
+    "currentTheme": {
+        "message": "Current: System",
+        "description": "Current theme indicator"
+    },
+    "autoTheme": {
+        "message": "Auto (System)",
+        "description": "Auto theme option"
+    },
+    "autoThemeDesc": {
+        "message": "Follows your system theme",
+        "description": "Auto theme description"
+    },
+    "lightTheme": {
+        "message": "Light",
+        "description": "Light theme option"
+    },
+    "lightThemeDesc": {
+        "message": "Clean and bright interface",
+        "description": "Light theme description"
+    },
+    "darkTheme": {
+        "message": "Dark",
+        "description": "Dark theme option"
+    },
+    "darkThemeDesc": {
+        "message": "Easy on the eyes",
+        "description": "Dark theme description"
+    },
+    "advancedSettings": {
+        "message": "Advanced Settings",
+        "description": "Advanced settings section"
+    },
+    "rememberTheme": {
+        "message": "Remember theme choice",
+        "description": "Theme persistence setting"
+    },
+    "animationSpeed": {
+        "message": "Animation speed:",
+        "description": "Animation speed setting"
+    },
+    "fast": {
+        "message": "Fast",
+        "description": "Fast speed option"
+    },
+    "normal": {
+        "message": "Normal",
+        "description": "Normal speed option"
+    },
+    "slow": {
+        "message": "Slow",
+        "description": "Slow speed option"
+    },
+    "toggleAll": {
+        "message": "Toggle All",
+        "description": "Toggle all modules button"
+    },
+    "loadingModules": {
+        "message": "Loading modules...",
+        "description": "Modules loading indicator"
+    },
+    "enableModule": {
+        "message": "Enable",
+        "description": "Enable module checkbox"
+    },
+    "trackRemovedBlocks": {
+        "message": "Track removed blocks",
+        "description": "Track removed blocks setting"
+    },
+    "autoScan": {
+        "message": "Auto-scan on page load",
+        "description": "Auto-scan setting"
+    },
+    "allowIntervention": {
+        "message": "Allow page intervention for testing",
+        "description": "Test permission flag for page intervention"
+    },
+    "scanInterval": {
+        "message": "Scan interval (ms):",
+        "description": "Scan interval setting"
+    },
+    "maxElements": {
+        "message": "Max elements per scan:",
+        "description": "Max elements setting"
+    },
+    "detectionSettings": {
+        "message": "Detection Settings",
+        "description": "Detection settings section"
+    },
+    "sensitivity": {
+        "message": "Sensitivity:",
+        "description": "Sensitivity setting"
+    },
+    "sensitivityLow": {
+        "message": "Low",
+        "description": "Low sensitivity option"
+    },
+    "sensitivityMedium": {
+        "message": "Medium",
+        "description": "Medium sensitivity option"
+    },
+    "sensitivityHigh": {
+        "message": "High",
+        "description": "High sensitivity option"
+    },
+    "actionOnDetect": {
+        "message": "Action on detection:",
+        "description": "Action on detection setting"
+    },
+    "actionLog": {
+        "message": "Log only",
+        "description": "Log action option"
+    },
+    "actionBlock": {
+        "message": "Block automatically",
+        "description": "Block action option"
+    },
+    "actionNotify": {
+        "message": "Notify user",
+        "description": "Notify action option"
+    },
+    "debugMode": {
+        "message": "Enable debug mode",
+        "description": "Debug mode setting"
+    },
+    "customRules": {
+        "message": "Custom rules (JSON):",
+        "description": "Custom rules setting"
+    },
+    "customRulesPlaceholder": {
+        "message": "{\"rules\": []}",
+        "description": "Custom rules placeholder"
+    },
+    "resetToDefault": {
+        "message": "Reset to Default",
+        "description": "Reset settings button"
+    },
+    "triggerPhrases": {
+        "message": "Trigger Phrases",
+        "description": "Trigger phrases module name"
+    },
+    "promptSplitting": {
+        "message": "Prompt Splitting",
+        "description": "Prompt splitting module name"
+    },
+    "apiInterceptor": {
+        "message": "API Interceptor",
+        "description": "API interceptor module name"
+    },
+    "saveSettings": {
+        "message": "Save Settings",
+        "description": "Save settings button"
+    },
+    "resetSettings": {
+        "message": "Reset to Default",
+        "description": "Reset settings button"
+    },
+    "exportSettings": {
+        "message": "Export Settings",
+        "description": "Export settings button"
+    },
+    "importSettings": {
+        "message": "Import Settings",
+        "description": "Import settings button"
+    },
+    "confirmReset": {
+        "message": "Are you sure you want to reset all settings to default?",
+        "description": "Reset confirmation message"
+    },
+    "popupTitle": {
+        "message": "Security Scanner",
+        "description": "Popup title"
+    },
+    "active": {
+        "message": "Active",
+        "description": "Active status"
+    },
+    "inactive": {
+        "message": "Inactive",
+        "description": "Inactive status"
+    },
+    "scanPage": {
+        "message": "Scan This Page",
+        "description": "Scan page button"
+    },
+    "threatsBlocked": {
+        "message": "Threats blocked:",
+        "description": "Threats blocked counter"
+    },
+    "lastScan": {
+        "message": "Last scan:",
+        "description": "Last scan time"
+    },
+    "activeModules": {
+        "message": "Active Modules",
+        "description": "Active modules section"
+    },
+    "quickActions": {
+        "message": "Quick Actions",
+        "description": "Quick actions section"
+    },
+    "enableAll": {
+        "message": "Enable All",
+        "description": "Enable all modules button"
+    },
+    "disableAll": {
+        "message": "Disable All",
+        "description": "Disable all modules button"
+    },
+    "viewReport": {
+        "message": "View Report",
+        "description": "View report button"
+    },
+    "currentPage": {
+        "message": "Current Page",
+        "description": "Current page section"
+    },
+    "statusSafe": {
+        "message": "Safe",
+        "description": "Safe status"
+    },
+    "statusWarning": {
+        "message": "Warning",
+        "description": "Warning status"
+    },
+    "statusDanger": {
+        "message": "Danger",
+        "description": "Danger status"
+    },
+    "dashboard": {
+        "message": "Dashboard",
+        "description": "Dashboard navigation"
+    },
+    "modules": {
+        "message": "Modules",
+        "description": "Modules navigation"
+    },
+    "settings": {
+        "message": "Settings",
+        "description": "Settings navigation"
+    },
+    "statistics": {
+        "message": "Statistics",
+        "description": "Statistics navigation"
+    },
+    "openSettings": {
+        "message": "Open Settings",
+        "description": "Open settings tooltip"
+    },
+    "scanTooltip": {
+        "message": "Scan current page",
+        "description": "Scan button tooltip"
+    },
+    "settingsTooltip": {
+        "message": "Open settings",
+        "description": "Settings button tooltip"
+    },
+    "helpTooltip": {
+        "message": "Get help",
+        "description": "Help button tooltip"
+    },
+    "help": {
+        "message": "Help",
+        "description": "Help button"
+    },
+    "documentation": {
+        "message": "Documentation",
+        "description": "Documentation link"
+    },
+    "reportIssue": {
+        "message": "Report Issue",
+        "description": "Report issue link"
+    },
+    "about": {
+        "message": "About",
+        "description": "About link"
+    },
+    "sendFeedback": {
+        "message": "Send Feedback",
+        "description": "Send feedback button"
+    },
+    "settingsSaved": {
+        "message": "Settings saved successfully!",
+        "description": "Settings saved notification"
+    },
+    "settingsReset": {
+        "message": "Settings reset to default!",
+        "description": "Settings reset notification"
+    },
+    "saveError": {
+        "message": "Error saving settings!",
+        "description": "Save error notification"
+    },
+    "resetError": {
+        "message": "Error resetting settings!",
+        "description": "Reset error notification"
+    },
+    "componentLoadError": {
+        "message": "Failed to load component",
+        "description": "Component load error"
+    },
+    "reloadPage": {
+        "message": "Reload Page",
+        "description": "Reload page button"
+    },
+    "elementsScanned": {
+        "message": "Elements scanned",
+        "description": "Elements scanned statistic"
+    },
+    "threatsDetected": {
+        "message": "Threats detected",
+        "description": "Threats detected statistic"
+    },
+    "lastScanTime": {
+        "message": "Last scan time",
+        "description": "Last scan time statistic"
+    },
+    "enabled": {
+        "message": "Enabled",
+        "description": "Enabled state label"
+    },
+    "disabled": {
+        "message": "Disabled",
+        "description": "Disabled state label"
+    },
+    "module": {
+        "message": "Module",
+        "description": "Generic module label"
+    },
+    "scanNow": {
+        "message": "Scan Now",
+        "description": "Scan now action"
+    },
+    "testModule": {
+        "message": "Test",
+        "description": "Test module action"
+    },
+    "scanCompleted": {
+        "message": "Scan completed",
+        "description": "Scan completed message"
+    },
+    "scanFailed": {
+        "message": "Scan failed",
+        "description": "Scan failed message"
+    },
+    "toggleFailed": {
+        "message": "Failed to toggle module",
+        "description": "Toggle failed message"
+    },
+    "showSettings": {
+        "message": "Show Settings",
+        "description": "Show module settings action"
+    },
+    "hideSettings": {
+        "message": "Hide Settings",
+        "description": "Hide module settings action"
+    },
+    "generalSettings": {
+        "message": "General Settings",
+        "description": "General settings group title"
+    },
+    "performanceSettings": {
+        "message": "Performance Settings",
+        "description": "Performance settings group title"
+    },
+    "moduleName": {
+        "message": "Module Name",
+        "description": "Generic module name placeholder"
+    },
+    "moduleDescription": {
+        "message": "Module description",
+        "description": "Generic module description placeholder"
+    },
+    "pagesScanned": {
+        "message": "Pages scanned",
+        "description": "Pages scanned counter label"
+    },
+    "scan": {
+        "message": "Scan",
+        "description": "Header scan action"
+    },
+    "statusActive": {
+        "message": "Active",
+        "description": "Header status active"
+    },
+    "welcomeMessage": {
+        "message": "Thank you for installing PageCheck! Your browser is now protected.",
+        "description": "Welcome notification message"
+    },
+    "detectLinkMismatch": {
+        "message": "Detect link text mismatch",
+        "description": "Detect text and href mismatch"
+    },
+    "detectRedirectPatterns": {
+        "message": "Detect redirect patterns",
+        "description": "Detect redirect pattern setting"
+    },
+    "visualManipulation": {
+        "message": "Hidden Content & Visual Manipulation",
+        "description": "Visual manipulation module label"
+    },
+    "monitorOnly": {
+        "message": "Monitor only",
+        "description": "Monitor-only mode setting"
+    },
+    "detectHomographs": {
+        "message": "Detect homographs",
+        "description": "Detect homograph setting"
+    },
+    "detectOverlays": {
+        "message": "Detect deceptive overlays",
+        "description": "Detect overlay setting"
+    },
+    "detectStyleObfuscation": {
+        "message": "Detect style obfuscation",
+        "description": "Detect CSS obfuscation setting"
+    },
+    "detectHiddenText": {
+        "message": "Detect hidden text",
+        "description": "Detect hidden text setting"
+    },
+    "findingHiddenTextDisplayNoneSummary": {
+        "message": "Potential hidden text via display: none",
+        "description": "Summary for hidden text detected via display none"
+    },
+    "findingHiddenTextDisplayNoneDetails": {
+        "message": "$1 [display:none $2 ($3); mode=$4]",
+        "description": "Details for hidden text via display none with source, match type, and mode"
+    },
+    "findingHiddenTextDisplayNoneDetailsCollapsed": {
+        "message": "$1 [display:none on container ($3); hidden text sample: $2; mode=$4]",
+        "description": "Details for hidden text collapsed onto the hiding container, with container, sample node, match type, and mode"
+    },
+    "findingHiddenTextGenericSummary": {
+        "message": "Potential hidden or visually suppressed text",
+        "description": "Summary for generic hidden text finding"
+    },
+    "findingHiddenTextVisibilitySummary": {
+        "message": "Potential hidden text via visibility: hidden",
+        "description": "Summary for hidden text detected via visibility hidden"
+    },
+    "findingHiddenTextVisibilityDetails": {
+        "message": "$1 [visibility:hidden $2 ($3)]",
+        "description": "Details for hidden text via visibility hidden with source and match type"
+    },
+    "findingHiddenTextOpacitySummary": {
+        "message": "Potential hidden text via opacity: 0",
+        "description": "Summary for hidden text detected via opacity zero"
+    },
+    "findingHiddenTextOpacityDetails": {
+        "message": "$1 [opacity:0 $2 ($3)]",
+        "description": "Details for hidden text via opacity zero with source and match type"
+    },
+    "findingHiddenTextOffscreenSummary": {
+        "message": "Potential hidden text via deliberate off-screen positioning",
+        "description": "Summary for hidden text detected via deliberate off-screen positioning"
+    },
+    "findingHiddenTextOffscreenDetails": {
+        "message": "$1 [off-screen $2; signals=$3; position=$4; rect=$5]",
+        "description": "Details for hidden text via off-screen positioning with source, signal type, position, and rect snapshot"
+    },
+    "findingOffscreenSignalCoordinates": {
+        "message": "coordinates",
+        "description": "Signal label for coordinate-based off-screen detection"
+    },
+    "findingOffscreenSignalTransform": {
+        "message": "transform",
+        "description": "Signal label for transform-based off-screen detection"
+    },
+    "findingOffscreenSignalCoordinatesAndTransform": {
+        "message": "coordinates+transform",
+        "description": "Signal label for combined coordinate and transform off-screen detection"
+    },
+    "findingHiddenTextFontSizeSummary": {
+        "message": "Potential hidden text via font-size suppression",
+        "description": "Summary for hidden text detected via font-size suppression"
+    },
+    "findingHiddenTextFontSizeDetails": {
+        "message": "$1 [font-size $2; value=$3px; source=$4 ($5); context=$6; textLen=$7]",
+        "description": "Details for hidden text via font-size suppression with mode, value, source, match type, context, and text length"
+    },
+    "findingFontSizeModeZero": {
+        "message": "font-size: 0",
+        "description": "Font-size suppression mode label for zero font size"
+    },
+    "findingFontSizeModeNearZero": {
+        "message": "near-zero font-size (<= 1px)",
+        "description": "Font-size suppression mode label for near-zero font size"
+    },
+    "findingFontSizeModeAnomalous": {
+        "message": "anomalously small font-size (> 1px)",
+        "description": "Font-size suppression mode label for anomalously small font size"
+    },
+    "findingFontSizeContextNone": {
+        "message": "none",
+        "description": "Font-size suppression context label when there is no additional context"
+    },
+    "findingFontSizeContextOffscreen": {
+        "message": "off-screen",
+        "description": "Font-size suppression context label for off-screen signal"
+    },
+    "findingFontSizeContextOpacity": {
+        "message": "low opacity",
+        "description": "Font-size suppression context label for low opacity signal"
+    },
+    "findingFontSizeContextClipping": {
+        "message": "clipping",
+        "description": "Font-size suppression context label for clipping signal"
+    },
+    "findingFontSizeContextLowContrast": {
+        "message": "low contrast",
+        "description": "Font-size suppression context label for low contrast signal"
+    },
+    "findingFontSizeContextOverlay": {
+        "message": "overlay context",
+        "description": "Font-size suppression context label for overlay context signal"
+    },
+    "findingHiddenTextContrastSummary": {
+        "message": "Potential hidden text via text/background contrast camouflage",
+        "description": "Summary for hidden text detected via contrast camouflage"
+    },
+    "findingHiddenTextContrastDetails": {
+        "message": "$1 [contrast $2; ratio=$3; colorDistance=$4; context=$5; textLen=$6]",
+        "description": "Details for hidden text detected via contrast camouflage with mode, ratio, distance, context, and text length"
+    },
+    "findingContrastModeNearMatch": {
+        "message": "near-match colors",
+        "description": "Contrast camouflage mode label for near-matching text and background colors"
+    },
+    "findingContrastModeLowContrast": {
+        "message": "low contrast",
+        "description": "Contrast camouflage mode label for low contrast text and background colors"
+    },
+    "findingContrastContextNone": {
+        "message": "none",
+        "description": "Contrast camouflage context label when there is no additional suspicious context"
+    },
+    "findingContrastContextSmallFont": {
+        "message": "small font-size",
+        "description": "Contrast camouflage context label for small font-size"
+    },
+    "findingContrastContextOpacity": {
+        "message": "low opacity",
+        "description": "Contrast camouflage context label for low opacity"
+    },
+    "findingContrastContextOffscreen": {
+        "message": "off-screen",
+        "description": "Contrast camouflage context label for off-screen positioning"
+    },
+    "findingContrastContextClipping": {
+        "message": "clipping",
+        "description": "Contrast camouflage context label for clipping"
+    },
+    "findingContrastContextOverlay": {
+        "message": "overlay context",
+        "description": "Contrast camouflage context label for overlay context"
+    },
+    "findingHiddenTextTransparentSummary": {
+        "message": "Potential hidden text via transparent text colour",
+        "description": "Summary for hidden text detected via a transparent glyph fill colour"
+    },
+    "findingHiddenTextTransparentDetails": {
+        "message": "$1 [transparent text $2; alpha=$3; source=$4 ($5); context=$6; textLen=$7]",
+        "description": "Details for hidden text via transparent text colour with mode, alpha, source, match type, context, and text length"
+    },
+    "findingTransparentTextModeFull": {
+        "message": "fully transparent (alpha 0)",
+        "description": "Transparent text mode label for a fully transparent glyph fill"
+    },
+    "findingTransparentTextModeNear": {
+        "message": "near-transparent (alpha <= 0.05)",
+        "description": "Transparent text mode label for a near-transparent glyph fill"
+    },
+    "findingTransparentTextContextNone": {
+        "message": "none",
+        "description": "Transparent text context label when there is no additional context"
+    },
+    "findingTransparentTextContextTextVolume": {
+        "message": "large text volume",
+        "description": "Transparent text context label for a large amount of hidden text"
+    },
+    "findingTransparentTextContextOffscreen": {
+        "message": "off-screen",
+        "description": "Transparent text context label for off-screen signal"
+    },
+    "findingTransparentTextContextClipping": {
+        "message": "clipping context",
+        "description": "Transparent text context label for clipping context"
+    },
+    "findingTransparentTextContextOverlay": {
+        "message": "overlay context",
+        "description": "Transparent text context label for overlay context"
+    },
+    "findingHiddenTextTextIndentSummary": {
+        "message": "Potential hidden text via negative text-indent",
+        "description": "Summary for hidden text detected via negative text-indent"
+    },
+    "findingHiddenTextTextIndentDetails": {
+        "message": "$1 [text-indent $2; value=$3; source=$4 ($5); context=$6; lineModel=$7; textLen=$8]",
+        "description": "Details for hidden text via negative text-indent with mode, value, source, match type, context, line model, and text length"
+    },
+    "findingTextIndentModeExtreme": {
+        "message": "extreme negative text-indent",
+        "description": "Negative text-indent mode label for extreme text displacement"
+    },
+    "findingTextIndentModeSignificant": {
+        "message": "significant negative text-indent",
+        "description": "Negative text-indent mode label for significant text displacement"
+    },
+    "findingTextIndentContextNone": {
+        "message": "none",
+        "description": "Negative text-indent context label when there is no additional context"
+    },
+    "findingTextIndentContextOverflowHidden": {
+        "message": "overflow hidden",
+        "description": "Negative text-indent context label for overflow hidden"
+    },
+    "findingTextIndentContextNoWrap": {
+        "message": "no-wrap",
+        "description": "Negative text-indent context label for white-space nowrap"
+    },
+    "findingTextIndentContextSmallContainer": {
+        "message": "small container",
+        "description": "Negative text-indent context label for small container width"
+    },
+    "findingTextIndentContextOpacity": {
+        "message": "low opacity",
+        "description": "Negative text-indent context label for low opacity"
+    },
+    "findingTextIndentContextLowContrast": {
+        "message": "low contrast",
+        "description": "Negative text-indent context label for low contrast"
+    },
+    "findingTextIndentContextClipping": {
+        "message": "clipping",
+        "description": "Negative text-indent context label for clipping"
+    },
+    "findingTextIndentContextOverlay": {
+        "message": "overlay context",
+        "description": "Negative text-indent context label for overlay context"
+    },
+    "findingTextIndentLineModelLikelyFullHide": {
+        "message": "likely full text hide",
+        "description": "Negative text-indent line model label for likely full text hide"
+    },
+    "findingTextIndentLineModelFirstLineOnlyRisk": {
+        "message": "first-line-only risk",
+        "description": "Negative text-indent line model label for first-line-only risk"
+    },
+    "findingDisplayNoneSourceSelf": {
+        "message": "self",
+        "description": "Display none source label for own element"
+    },
+    "findingDisplayNoneSourceAncestor": {
+        "message": "ancestor",
+        "description": "Display none source label for ancestor element"
+    },
+    "findingDisplayNoneMatchTypeInline": {
+        "message": "inline",
+        "description": "Display none match type label for inline style"
+    },
+    "findingDisplayNoneMatchTypeComputed": {
+        "message": "computed",
+        "description": "Display none match type label for computed style"
+    },
+    "findingHiddenInputSummary": {
+        "message": "Potential hidden input or editable surface",
+        "description": "Summary for hidden input finding"
+    },
+    "findingHiddenInputConsentSummary": {
+        "message": "Potential hidden consent-related control",
+        "description": "Summary for hidden consent control finding"
+    },
+    "findingHiddenInputUploadSummary": {
+        "message": "Potential hidden file-upload control",
+        "description": "Summary for hidden file-upload control finding"
+    },
+    "findingHiddenInputDetails": {
+        "message": "$1 [control=$2; subtype=$3; reason=$4; source=$5 ($6); context=$7; contextSignals=$8]",
+        "description": "Details for hidden input finding with control, subtype, reason, source, match type, context category, and context signals"
+    },
+    "findingHiddenInputConsentDetails": {
+        "message": "$1 [consent control=$2; subtype=$3; reason=$4; source=$5 ($6); context=$7; contextSignals=$8]",
+        "description": "Details for hidden consent control finding"
+    },
+    "findingHiddenInputUploadDetails": {
+        "message": "$1 [upload control=$2; subtype=$3; reason=$4; source=$5 ($6); context=$7; contextSignals=$8]",
+        "description": "Details for hidden file-upload control finding"
+    },
+    "findingHiddenEditableSummary": {
+        "message": "Potential hidden editable surface",
+        "description": "Summary for hidden editable-surface finding"
+    },
+    "findingHiddenEditableDetails": {
+        "message": "$1 [editable control=$2; subtype=$3; reason=$4; source=$5 ($6); context=$7; contextSignals=$8]",
+        "description": "Details for hidden editable-surface finding"
+    },
+    "findingHiddenInputReasonHidden": {
+        "message": "hidden attribute",
+        "description": "Reason label for hidden input via hidden attribute"
+    },
+    "findingHiddenInputReasonDisplayNone": {
+        "message": "display: none",
+        "description": "Reason label for hidden input via display none"
+    },
+    "findingHiddenInputReasonVisibilityHidden": {
+        "message": "visibility: hidden",
+        "description": "Reason label for hidden input via visibility hidden"
+    },
+    "findingHiddenInputReasonOpacityZero": {
+        "message": "opacity: 0",
+        "description": "Reason label for hidden input via opacity zero"
+    },
+    "findingHiddenInputReasonOffscreen": {
+        "message": "off-screen",
+        "description": "Reason label for hidden input via off-screen placement"
+    },
+    "findingHiddenInputReasonZeroSize": {
+        "message": "zero-size",
+        "description": "Reason label for hidden input via zero or near-zero size"
+    },
+    "findingHiddenInputReasonVisualHidden": {
+        "message": "visual hidden fallback",
+        "description": "Reason label for hidden input via generic visual-hidden fallback"
+    },
+    "findingHiddenInputMatchTypeAttribute": {
+        "message": "attribute",
+        "description": "Match type label for hidden input via attribute"
+    },
+    "findingHiddenInputMatchTypeGeometry": {
+        "message": "geometry",
+        "description": "Match type label for hidden input via geometry"
+    },
+    "findingHiddenInputContextConsent": {
+        "message": "consent",
+        "description": "Context category label for consent-oriented hidden controls"
+    },
+    "findingHiddenInputContextUpload": {
+        "message": "upload",
+        "description": "Context category label for upload-oriented hidden controls"
+    },
+    "findingHiddenInputContextEditableSurface": {
+        "message": "editable-surface",
+        "description": "Context category label for editable-surface hidden controls"
+    },
+    "findingHiddenInputContextTextInput": {
+        "message": "text-input",
+        "description": "Context category label for text-like hidden controls"
+    },
+    "findingHiddenInputConsentSignalChecked": {
+        "message": "checked",
+        "description": "Consent-oriented signal label when hidden checkbox/radio is checked"
+    },
+    "findingHiddenInputConsentSignalRequired": {
+        "message": "required",
+        "description": "Consent-oriented signal label when hidden control is required"
+    },
+    "findingHiddenInputConsentSignalNearbyConsentText": {
+        "message": "nearby consent text",
+        "description": "Consent-oriented signal label when nearby text indicates consent/policy context"
+    },
+    "findingHiddenInputConsentSignalNone": {
+        "message": "none",
+        "description": "Consent-oriented signal label when no consent-specific signal is detected"
+    },
+    "findingHiddenInputConsentSignalVisibleReplacement": {
+        "message": "visible replacement",
+        "description": "Consent-oriented signal label when hidden checkbox/radio has a visible custom replacement"
+    },
+    "findingHiddenInputUploadSignalVisibleLabelTrigger": {
+        "message": "visible label trigger",
+        "description": "Upload-oriented signal label when hidden file input has a visible associated label trigger"
+    },
+    "findingHiddenInputUploadSignalVisibleButtonTrigger": {
+        "message": "visible button trigger",
+        "description": "Upload-oriented signal label when hidden file input has a visible button-like trigger"
+    },
+    "findingHiddenInputUploadSignalAriaControlsTrigger": {
+        "message": "aria-controls trigger",
+        "description": "Upload-oriented signal label when hidden file input has a visible aria-controls trigger"
+    },
+    "findingHiddenInputUploadSignalMissingVisibleTrigger": {
+        "message": "missing visible trigger",
+        "description": "Upload-oriented signal label when hidden file input has no visible trigger"
+    },
+    "findingHiddenInputUploadSignalNone": {
+        "message": "none",
+        "description": "Upload-oriented signal label when no upload-specific signal is detected"
+    },
+    "findingHiddenInputContextSignalNone": {
+        "message": "none",
+        "description": "Generic context signal label when no specific context signals are detected"
+    },
+    "findingHiddenInputInteractionFocusable": {
+        "message": "focusable",
+        "description": "Interaction signal label for hidden control that remains focusable"
+    },
+    "findingHiddenInputInteractionClickable": {
+        "message": "clickable",
+        "description": "Interaction signal label for hidden control with active pointer events"
+    },
+    "findingHiddenInputInteractionTabindex": {
+        "message": "tabindex",
+        "description": "Interaction signal label prefix for hidden control tabindex value"
+    },
+    "findingHiddenInputInteractionDisabled": {
+        "message": "disabled",
+        "description": "Interaction signal label for hidden control disabled state"
+    },
+    "findingHiddenInputInteractionAriaHidden": {
+        "message": "aria-hidden",
+        "description": "Interaction signal label for hidden control aria-hidden attribute"
+    },
+    "findingHiddenEditableContextRichTextEditor": {
+        "message": "rich-text-editor",
+        "description": "Editor context category for hidden rich-text editable surface"
+    },
+    "findingHiddenEditableContextPlainTextEditor": {
+        "message": "plain-text-editor",
+        "description": "Editor context category for hidden plaintext-only editable surface"
+    },
+    "findingHiddenEditableContextTextboxRole": {
+        "message": "textbox-role",
+        "description": "Editor context category for hidden role textbox surface"
+    },
+    "findingHiddenEditableContextFocusableEditable": {
+        "message": "focusable-editable",
+        "description": "Editor context category for hidden focusable editable surface"
+    },
+    "findingHiddenEditableSignalContentEditable": {
+        "message": "contenteditable",
+        "description": "Signal label when hidden editable surface is contenteditable"
+    },
+    "findingHiddenEditableSignalPlaintextOnly": {
+        "message": "plaintext-only",
+        "description": "Signal label when hidden editable surface uses contenteditable plaintext-only"
+    },
+    "findingHiddenEditableSignalRoleTextbox": {
+        "message": "role=textbox",
+        "description": "Signal label when hidden editable surface has role textbox"
+    },
+    "findingHiddenEditableSignalAriaMultiline": {
+        "message": "aria-multiline",
+        "description": "Signal label when hidden editable surface has aria-multiline true"
+    },
+    "findingHiddenEditableSignalSpellcheck": {
+        "message": "spellcheck",
+        "description": "Signal label when hidden editable surface has spellcheck attribute"
+    },
+    "findingHiddenEditableSignalInputmode": {
+        "message": "inputmode",
+        "description": "Signal label when hidden editable surface has inputmode attribute"
+    },
+    "findingHiddenEditableSignalPromptLike": {
+        "message": "prompt-like marker",
+        "description": "Signal label when hidden editable surface contains prompt-like placeholder markers"
+    },
+    "findingHiddenEditableSignalMeaningfulText": {
+        "message": "meaningful text",
+        "description": "Signal label when hidden editable surface contains meaningful text"
+    },
+    "findingOverlaySummary": {
+        "message": "Potential deceptive overlay or click-capture layer",
+        "description": "Summary for overlay finding"
+    },
+    "findingFullScreenOverlaySummary": {
+        "message": "Potential full-screen overlay over page content",
+        "description": "Summary for full-screen overlay finding"
+    },
+    "findingFullScreenOverlayDetails": {
+        "message": "$1 [coverage=$2; position=$3; z-index=$4; pointer-events=$5; markers=$6; context=$7; signals=$8]",
+        "description": "Details for full-screen overlay finding with geometry, CSS, marker, context and signal data"
+    },
+    "findingClickCaptureLayerSummary": {
+        "message": "Potential click-capture layer over an interactive target",
+        "description": "Summary for click-capture layer finding"
+    },
+    "findingClickCaptureLayerDetails": {
+        "message": "$1 [target=$2; targetElement=$3; point=$4; position=$5; z-index=$6; pointer-events=$7; opacity=$8; markers=$9; context=$10; signals=$11]",
+        "description": "Details for click-capture layer finding with top layer, underlying target, sample point, CSS and context data"
+    },
+    "findingSuspiciousStackingPatternSummary": {
+        "message": "Suspicious multi-layer stacking pattern around page controls",
+        "description": "Summary for suspicious stacking pattern finding"
+    },
+    "findingSuspiciousStackingPatternDetails": {
+        "message": "$1 [layers=$2; point=$3; reasons=$4; related=$5; layerStack=$6; context=$7]",
+        "description": "Details for suspicious stacking pattern finding with layer count, sample point, reasons, related findings, stack summary and benign context"
+    },
+    "findingDeceptiveCaptureSummary": {
+        "message": "Potential deceptive capture surface",
+        "description": "Summary for deceptive capture surface finding"
+    },
+    "findingDeceptiveCaptureIframeSummary": {
+        "message": "Potential deceptive iframe capture surface",
+        "description": "Summary for deceptive iframe capture surface finding"
+    },
+    "findingDeceptiveCaptureDetails": {
+        "message": "$1 [type=$2; scope=$3; signals=$4; linkedContext=$5]",
+        "description": "Details for deceptive capture finding with element type, scope, signals and linked context"
+    },
+    "findingDeceptiveCaptureScopeLocal": {
+        "message": "local",
+        "description": "Scope label for local deceptive capture finding"
+    },
+    "findingDeceptiveCaptureScopeOverlayLike": {
+        "message": "overlay-like",
+        "description": "Scope label for overlay-like deceptive capture finding"
+    },
+    "findingDeceptiveCaptureSignalOpacity": {
+        "message": "opacity",
+        "description": "Signal label for deceptive capture via opacity suppression"
+    },
+    "findingDeceptiveCaptureSignalNearTransparent": {
+        "message": "near-transparent",
+        "description": "Signal label for deceptive capture via near-transparent rendering"
+    },
+    "findingDeceptiveCaptureSignalNoVisualMarker": {
+        "message": "no visual marker",
+        "description": "Signal label for deceptive capture without visible text/background/border markers"
+    },
+    "findingDeceptiveCaptureSignalSuppressionSupport": {
+        "message": "suppression-support",
+        "description": "Signal label for supportive clipping/suppression context"
+    },
+    "findingDeceptiveCaptureSignalPointerEvents": {
+        "message": "pointer-events",
+        "description": "Signal label for active pointer events"
+    },
+    "findingDeceptiveCaptureSignalCursorPointer": {
+        "message": "cursor-pointer",
+        "description": "Signal label for pointer cursor"
+    },
+    "findingDeceptiveCaptureSignalFocusable": {
+        "message": "focusable",
+        "description": "Signal label for focusable deceptive capture surface"
+    },
+    "findingDeceptiveCaptureSignalHighZIndex": {
+        "message": "high-z-index",
+        "description": "Signal label for high z-index deceptive capture surface"
+    },
+    "findingDeceptiveCaptureSignalLargeArea": {
+        "message": "large-area",
+        "description": "Signal label for large deceptive capture surface area"
+    },
+    "findingDeceptiveCaptureSignalOverlayingUi": {
+        "message": "overlaying-ui",
+        "description": "Signal label for deceptive capture surface overlaying visible UI"
+    },
+    "findingDeceptiveCaptureSignalLabelHiddenControl": {
+        "message": "label-hidden-control",
+        "description": "Signal label for label linked to hidden consent/upload control"
+    },
+    "findingStyleObfuscationSummary": {
+        "message": "Potential CSS-based visual obfuscation",
+        "description": "Summary for style obfuscation finding"
+    },
+    "findingClippingHidingSummary": {
+        "message": "Potential content hiding through CSS clipping",
+        "description": "Summary for CSS clipping hiding finding"
+    },
+    "findingClippingHidingDetails": {
+        "message": "$1 [source=$2; sourceElement=$3; clipSource=$4; value=$5; reason=$6; context=$7; benign=$8; escalation=$9]",
+        "description": "Details for CSS clipping hiding finding with source, value, reason, content context, benign context and escalation signals"
+    },
+    "findingTransformSuppressionSummary": {
+        "message": "Potential content hiding through transform scale suppression",
+        "description": "Summary for transform scale suppression finding"
+    },
+    "findingTransformSuppressionDetails": {
+        "message": "$1 [source=$2; sourceElement=$3; transformSource=$4; value=$5; reason=$6; scale=$7; context=$8; benign=$9; escalation=$10]",
+        "description": "Details for transform suppression finding with source, transform value, normalized scale, content context, benign context and escalation signals"
+    },
+    "findingFilterBlendManipulationSummary": {
+        "message": "Potential visibility manipulation through CSS filter or blend mode",
+        "description": "Summary for filter or blend-mode manipulation finding"
+    },
+    "findingFilterBlendManipulationDetails": {
+        "message": "$1 [source=$2; sourceElement=$3; effectSource=$4; value=$5; reason=$6; context=$7; benign=$8; escalation=$9]",
+        "description": "Details for filter or blend-mode manipulation finding with source, effect value, normalized reason, content context, benign context and escalation signals"
+    },
+    "findingSemanticVisibilityMismatchSummary": {
+        "message": "Visible content is hidden or neutralized in semantic accessibility state",
+        "description": "Summary for visible semantic mismatch finding"
+    },
+    "findingSemanticVisibilityMismatchDetails": {
+        "message": "$1 [source=$2; sourceElement=$3; semanticSignal=$4; context=$5; visible=true; interaction=$6; benign=$7; escalation=$8]",
+        "description": "Details for visible semantic mismatch finding with semantic source, content context, interaction state, benign context and escalation signals"
+    },
+    "findingUnsafeProtocolSummary": {
+        "message": "Potentially unsafe navigation protocol",
+        "description": "Summary for unsafe protocol finding"
+    },
+    "findingRedirectPatternSummary": {
+        "message": "Potential redirect or bounce URL pattern",
+        "description": "Summary for redirect pattern finding"
+    },
+    "findingLinkMismatchSummary": {
+        "message": "Visible link text differs from actual target hostname",
+        "description": "Summary for visible link mismatch finding"
+    },
+    "findingHostnameMixedPunycodeSummary": {
+        "message": "Mixed-script hostname with punycode segment",
+        "description": "Summary for mixed-script punycode hostname finding"
+    },
+    "findingHostnameMixedScriptSummary": {
+        "message": "Mixed-script hostname may indicate homograph spoofing",
+        "description": "Summary for mixed-script hostname finding"
+    },
+    "findingHostnamePunycodeSummary": {
+        "message": "Punycode hostname requires review",
+        "description": "Summary for punycode hostname finding"
+    },
+    "findingApiSurfaceSummary": {
+        "message": "Potential page-side API interaction surface detected",
+        "description": "Summary for API surface finding"
+    },
+    "findingApiSurfaceDetails": {
+        "message": "$1: $2",
+        "description": "Details for API surface finding"
+    },
+    "findingPromptSplittingSummary": {
+        "message": "Potential split prompt fragments detected",
+        "description": "Summary for prompt splitting finding"
+    },
+    "findingTriggerPhraseSummary": {
+        "message": "Potential trigger phrase fragment detected",
+        "description": "Summary for trigger phrase finding"
+    },
+    "hiddenTextDisplayMode": {
+        "message": "display:none detection mode:",
+        "description": "Display none detection mode setting"
+    },
+    "hiddenTextDisplayModeAncestors": {
+        "message": "Mode A (default): element + ancestors (higher coverage)",
+        "description": "Display none mode A option"
+    },
+    "hiddenTextDisplayModeSelf": {
+        "message": "Mode B: element only (fewer false positives)",
+        "description": "Display none mode B option"
+    },
+    "visualManipulationDesc": {
+        "message": "Detects hidden text, hidden inputs, deceptive overlays, and CSS-based visual manipulation",
+        "description": "Visual manipulation module description"
+    },
+    "caseSensitive": {
+        "message": "Case-sensitive matching",
+        "description": "Case-sensitive matching setting"
+    },
+    "detectionThreshold": {
+        "message": "Detection threshold",
+        "description": "Detection threshold setting"
+    },
+    "detectHiddenInputs": {
+        "message": "Detect hidden inputs",
+        "description": "Detect hidden inputs setting"
+    },
+    "detectDeceptiveCapture": {
+        "message": "Detect deceptive capture surfaces",
+        "description": "Detect deceptive capture surfaces setting"
+    },
+    "detectUnsafeProtocols": {
+        "message": "Detect unsafe protocols",
+        "description": "Detect unsafe protocol setting"
+    },
+    "linkDomainSecurityDesc": {
+        "message": "Analyzes links, domains, redirects, homographs, and unsafe protocols",
+        "description": "Link and domain security description"
+    },
+    "visualManipulationName": {
+        "message": "Hidden Content & Visual Manipulation",
+        "description": "Visual manipulation module name"
+    },
+    "linkDomainSecurityName": {
+        "message": "Link & Domain Security",
+        "description": "Link and domain security module name"
+    },
+    "linkDomainSecurity": {
+        "message": "Link & Domain Security",
+        "description": "Link and domain security module label"
+    },
+    "toggleMenu": {
+        "message": "Toggle menu",
+        "description": "Label for the mobile menu button"
+    },
+    "optionsInitError": {
+        "message": "Failed to initialize options page",
+        "description": "Options page initialization error"
+    },
+    "defaultConfigLoadWarning": {
+        "message": "Default configuration was loaded because saved settings could not be read",
+        "description": "Warning about fallback to default config"
+    },
+    "settingsExported": {
+        "message": "Settings exported successfully",
+        "description": "Settings export success message"
+    },
+    "exportError": {
+        "message": "Failed to export settings",
+        "description": "Settings export error"
+    },
+    "settingsImported": {
+        "message": "Settings imported successfully",
+        "description": "Settings import success message"
+    },
+    "importError": {
+        "message": "Failed to import settings",
+        "description": "Settings import error"
+    },
+    "invalidConfigFile": {
+        "message": "Invalid configuration file",
+        "description": "Invalid config file message"
+    },
+    "globalErrorTitle": {
+        "message": "Error",
+        "description": "Global error title"
+    },
+    "popupInitError": {
+        "message": "Failed to initialize popup",
+        "description": "Popup initialization error"
+    },
+    "pageNotScannable": {
+        "message": "This page cannot be scanned",
+        "description": "Non-scannable page message"
+    },
+    "loading": {
+        "message": "Loading...",
+        "description": "Loading placeholder"
+    },
+    "securityScorePlaceholder": {
+        "message": "Score: 95/100",
+        "description": "Security score placeholder"
+    },
+    "helpPageTitle": {
+        "message": "PageCheck Help",
+        "description": "Help page title"
+    },
+    "helpPageIntro": {
+        "message": "This help section is available as a stub and will be expanded before release.",
+        "description": "Help page intro"
+    },
+    "helpPageStubTitle": {
+        "message": "Current State",
+        "description": "Help stub section title"
+    },
+    "helpPageStub": {
+        "message": "The page already works as a navigation target from the popup and stores the structure for future user help.",
+        "description": "Help stub body"
+    },
+    "plannedNextTitle": {
+        "message": "Planned Next",
+        "description": "Planned next section title"
+    },
+    "helpPlannedItem1": {
+        "message": "Module descriptions and practical examples.",
+        "description": "First planned help item"
+    },
+    "helpPlannedItem2": {
+        "message": "Explanation of scan results and statuses.",
+        "description": "Second planned help item"
+    },
+    "helpPlannedItem3": {
+        "message": "Troubleshooting guide and FAQ.",
+        "description": "Third planned help item"
+    },
+    "aboutPageTitle": {
+        "message": "About PageCheck",
+        "description": "About page title"
+    },
+    "aboutPageIntro": {
+        "message": "This page is a stub for release information, project context, and extension metadata.",
+        "description": "About page intro"
+    },
+    "aboutPageStubTitle": {
+        "message": "Current State",
+        "description": "About stub section title"
+    },
+    "aboutPageStub": {
+        "message": "The page already works from the popup and can be expanded later into a full release/about screen.",
+        "description": "About stub body"
+    },
+    "currentVersionLabel": {
+        "message": "Current Version",
+        "description": "Current version label"
+    },
+    "aboutStatusLabel": {
+        "message": "Status",
+        "description": "About status label"
+    },
+    "aboutStatusValue": {
+        "message": "MVP stub",
+        "description": "About status value"
+    },
+    "findingCssBidiPresentationSummary": {
+        "message": "CSS bidi override can change the perceived order of text",
+        "description": "Summary for suspicious CSS bidi text presentation"
+    },
+    "findingCssBidiPresentationDetails": {
+        "message": "$1 [direction=$2; unicode-bidi=$3; context=$4; supporting=$5]",
+        "description": "Details for suspicious CSS bidi text presentation"
+    },
+    "findingPseudoContentSubstitutionSummary": {
+        "message": "Generated CSS content may replace the visible label",
+        "description": "Summary for generated pseudo-content substitution"
+    },
+    "findingPseudoContentSubstitutionDetails": {
+        "message": "$1 [source=$2; reason=$3; context=$4; supporting=$5]",
+        "description": "Details for generated pseudo-content substitution"
+    },
+    "findingCssTextMaskingSummary": {
+        "message": "CSS text masking hides the displayed text",
+        "description": "Summary for CSS text masking"
+    },
+    "findingHostnameCurrentDetails": {
+        "message": "Current page hostname: $1",
+        "description": "Details for a current-page hostname finding"
+    },
+    "findingHostnameTargetDetails": {
+        "message": "Target hostname: $1; $2",
+        "description": "Details for a target hostname finding"
+    },
+    "findingUnsafeProtocolDetails": {
+        "message": "Protocol: $1; $2",
+        "description": "Details for an unsafe navigation protocol finding"
+    },
+    "findingRedirectPatternDetails": {
+        "message": "Redirect parameter: $1; destination hostname: $2; $3",
+        "description": "Details for a redirect-pattern finding"
+    },
+    "findingLinkMismatchDetails": {
+        "message": "Visible hostname: $1; target hostname: $2; $3",
+        "description": "Details for a visible link mismatch finding"
+    },
+    "apiPermissionRequired": {
+        "message": "API Interception needs HTTP/HTTPS permission to enable observation.",
+        "description": "Shown when API Interception requires its optional HTTP and HTTPS permission"
+    },
+    "apiPermissionDenied": {
+        "message": "Permission was not granted. API Interception remains disabled.",
+        "description": "Shown when the user denies the API Interception permission request"
+    },
+    "apiPermissionUnavailable": {
+        "message": "Permission API is unavailable. API Interception remains disabled.",
+        "description": "Shown when the browser permissions API is unavailable"
+    },
+    "apiPermissionRemovalFailed": {
+        "message": "API Interception is disabled, but permission removal failed.",
+        "description": "Shown when disabling succeeds but browser permission removal fails"
+    },
+    "findingCssTextMaskingDetails": {
+        "message": "$1 [text-security=$2; reason=masked-text; context=$3; supporting=$4]",
+        "description": "Details for CSS text masking"
+    },
+    "findingsApiSettings": {
+        "message": "Findings API",
+        "description": "Section title for the findings API settings"
+    },
+    "findingsApiWarning": {
+        "message": "Off by default. When enabled, listed extensions can read what PageCheck found on the page you are viewing. Page scripts can never use this channel.",
+        "description": "Privacy warning for the findings API"
+    },
+    "findingsApiEnabledLabel": {
+        "message": "Share findings with extensions",
+        "description": "Label for the findings API toggle"
+    },
+    "findingsApiAllowlistLabel": {
+        "message": "Allowed extension IDs",
+        "description": "Label for the findings API allowlist field"
+    },
+    "findingsApiAllowlistHint": {
+        "message": "Comma-separated 32-character IDs. An empty list shares with nobody, even when the switch above is on.",
+        "description": "Hint for the findings API allowlist field"
+    }
+}

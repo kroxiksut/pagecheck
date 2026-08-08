@@ -1,0 +1,65 @@
+# AI instructions and private workspace files
+AGENTS.md
+AGENTS.ru.md
+AI_CONTEXT.md
+AI_CONTEXT.ru.md
+AI_RULES.md
+AI_RULES.ru.md
+CLA.md
+CLAUDE.md
+.agents/
+.codex/
+_metadata/
+
+# Task, planning, and validation working files
+**/TASKS*.md
+**/MANUAL-TESTS*.md
+**/*REPORT*.md
+**/*PROTOCOL*.md
+**/*SCENARIOS*.md
+**/*STATUS*.md
+**/*INVENTORY*.md
+**/*MATRIX*.md
+**/PILOT-BASELINE*.md
+**/OBSERVATION-REGISTRY*.md
+MULTIBROWSER*.md
+ROADMAP*.md
+
+# Generated packages, test output, and temporary files
+dist/
+release/
+build/
+coverage/
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+web-ext-artifacts/
+*.crx
+*.xpi
+*.zip
+*.lcov
+*.log
+*-debug.log*
+*-error.log*
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Local environment files and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local IDE and operating-system settings
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
