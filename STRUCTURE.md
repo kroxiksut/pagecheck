@@ -23,6 +23,7 @@
 |   |   |-- SemanticAnalysisCore.test.mjs
 |   |   |-- coreDefects.test.mjs             # shield tests for the Priority 1 defects (rule shape, U+FEFF flags, overlap scan, partial)
 |   |   |-- boundaryContract.test.mjs        # shield: core stays DOM-free and subject-free, one catalog for both modules, candidate text never leaves
+|   |   |-- catalogSelfConsistency.test.mjs  # shield: rule examples hold, required phrases can match, ids/versions/language pairs are sane
 |   |   |-- fallbackTokenization.test.mjs    # the tokenization branch without Intl.Segmenter (ranges, mapping reliability)
 |   |   |-- run-tests.cjs
 |   |   |-- README.md
