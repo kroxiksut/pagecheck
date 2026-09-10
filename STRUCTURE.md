@@ -13,6 +13,7 @@
 |
 |-- modules/
 |   |-- ModuleCore.js
+|   |-- crossModuleBoundaries.test.mjs      # shield: no module imports a sibling's internals or the runtime; subject ownership (AGENTS cross-module rule)
 |   |-- timeSlicing.test.mjs                  # shield: cooperative slicing, active-time budgets, pause during a yield (C2)
 |   |-- loopSafety.test.mjs                   # shield: the extension's own DOM edits never become work or findings (C4)
 |   |-- *.test.mjs                          # core-contract shield tests (scan exclusion, error policy)
@@ -21,6 +22,7 @@
 |   |   |-- semanticCatalog.js
 |   |   |-- SemanticAnalysisCore.test.mjs
 |   |   |-- coreDefects.test.mjs             # shield tests for the Priority 1 defects (rule shape, U+FEFF flags, overlap scan, partial)
+|   |   |-- boundaryContract.test.mjs        # shield: core stays DOM-free and subject-free, one catalog for both modules, candidate text never leaves
 |   |   |-- fallbackTokenization.test.mjs    # the tokenization branch without Intl.Segmenter (ranges, mapping reliability)
 |   |   |-- run-tests.cjs
 |   |   |-- README.md

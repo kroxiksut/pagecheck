@@ -126,7 +126,12 @@ function shouldExclude(relativePath, target) {
         return true;
     }
     const basename = path.basename(relativePath);
-    if (EXCLUDED_FILE_NAMES.has(basename) || basename.endsWith('.md') || basename.endsWith('.test.mjs')) {
+    // `.mjs` исключается ЦЕЛИКОМ, а не по шаблону `*.test.mjs`. Причина не теоретическая: Яндекс.Диск
+    // создал конфликтную копию `crossModuleBoundaries.test (копия с компьютера DESKTOP).mjs`, она не
+    // подошла под шаблон - и уехала в пакет к пользователю. В рантайме расширения файлов `.mjs` нет
+    // ни одного (тесты, фикстуры и сборочные скрипты - все `.mjs`), поэтому правило по расширению
+    // строго сильнее и не зависит от того, как назван файл.
+    if (EXCLUDED_FILE_NAMES.has(basename) || basename.endsWith('.md') || basename.endsWith('.mjs')) {
         return true;
     }
     if (target === 'firefox' && (segments[0] === 'rules' || relativePath === path.join('assets', 'blocked.html'))) {

@@ -70,16 +70,30 @@ const chromeBuildOne = await buildTargetPackage('chrome');
 const chromeBuildTwo = await buildTargetPackage('chrome');
 const firefoxBuild = await buildTargetPackage('firefox');
 assert.deepEqual(chromeBuildOne.inventory, chromeBuildTwo.inventory);
-assert.equal(chromeBuildOne.inventory.some((entry) => /(^|\/)(tests|fixtures)(\/|$)|\.test\.mjs$|\.md$/i.test(entry.path)), false);
+assert.equal(chromeBuildOne.inventory.some((entry) => /(^|\/)(tests|fixtures)(\/|$)|\.mjs$|\.md$/i.test(entry.path)), false);
 assert.equal(chromeBuildOne.inventory.some((entry) => /(^|\/)(scripts|manifests|manual-tests)(\/|$)|(^|\/)run-tests\.cjs$/i.test(entry.path)), false);
 assert.equal(chromeBuildOne.inventory.some((entry) => entry.path === '_locales/en/messages.json'), true);
 assert.equal(chromeBuildOne.inventory.some((entry) => entry.path === 'modules/ModuleCore.js'), true);
 assert.equal(firefoxBuild.inventory.some((entry) => entry.path === 'rules/ruleset.json' || entry.path === 'assets/blocked.html'), false);
-assert.equal(firefoxBuild.inventory.some((entry) => /(^|\/)(tests|fixtures)(\/|$)|\.test\.mjs$|\.md$/i.test(entry.path)), false);
+assert.equal(firefoxBuild.inventory.some((entry) => /(^|\/)(tests|fixtures)(\/|$)|\.mjs$|\.md$/i.test(entry.path)), false);
 assert.equal(firefoxBuild.inventory.some((entry) => /(^|\/)(scripts|manifests|manual-tests)(\/|$)|(^|\/)run-tests\.cjs$/i.test(entry.path)), false);
 assert.equal(firefoxBuild.inventory.some((entry) => entry.path === '_locales/ru/messages.json'), true);
 assert.equal(firefoxBuild.inventory.some((entry) => entry.path === 'modules/ModuleCore.js'), true);
 assert.equal(JSON.parse(await readFile(path.join(chromeBuildOne.outputDirectory, 'manifest.json'), 'utf8')).version, baseManifest.version);
 assert.equal(JSON.parse(await readFile(path.join(firefoxBuild.outputDirectory, 'manifest.json'), 'utf8')).background.scripts[0], 'js/background.js');
+
+// Пакет не имеет права содержать НИ ОДНОГО `.mjs`: в рантайме расширения таких файлов нет вовсе -
+// это всегда тест, фикстура или сборочный скрипт. Правило по расширению, а не по шаблону имени,
+// потому что шаблон `*.test.mjs` однажды уже пропустил конфликтную копию, созданную синхронизацией
+// диска (`crossModuleBoundaries.test (копия с компьютера DESKTOP).mjs`), и она уехала в пакет.
+for (const build of [chromeBuildOne, firefoxBuild]) {
+    const stray = build.inventory.filter((entry) => entry.path.toLowerCase().endsWith('.mjs'));
+    assert.deepEqual(stray, [], `в пакете не может быть .mjs: ${stray.map((entry) => entry.path).join(', ')}`);
+
+    // Конфликтные копии и бэкапы редактора: имя произвольное, поэтому ловим по признаку, а не по
+    // расширению. Такой файл в пакете - это чужая версия кода, доехавшая до пользователя.
+    const copies = build.inventory.filter((entry) => /копия|\bcopy\b|\(\d+\)\.|\.bak$|~$/i.test(entry.path));
+    assert.deepEqual(copies, [], `в пакете не может быть конфликтных копий: ${copies.map((entry) => entry.path).join(', ')}`);
+}
 
 console.log('Manifest and deterministic package contract checks passed');
