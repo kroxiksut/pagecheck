@@ -14,7 +14,6 @@
 ## Текущее поведение
 - Модуль может создаваться через общий менеджер модулей.
 - По умолчанию он отключён в текущей конфигурации.
-- Общий флаг `allowIntervention` по умолчанию включён для тестирования.
 - При включении collector формирует/reconstructs candidates, оценивает metadata-only decisions и reconcile'ит bounded prompt-splitting findings. Модуль и findings по умолчанию остаются отключёнными.
 - Collector обходит DOM итеративно и resumable; рекурсивная реализация `ModuleCore.firstScan()` не используется.
 
@@ -50,6 +49,8 @@
 - `PromptMutationQueue` сразу coalesce'ит bounded live roots и removed candidate identities. Text удалённого subtree не читается и не удерживается. Overflow сохраняет known findings, выставляет `partial` и запрашивает не более одного bounded reconciliation pass при initial work.
 - Initial collection и reconstruction выполняются bounded slices. Каждый scan получает immutable configuration/lifecycle revision; stale work abort'ится до finding commit или status publication.
 - `sensitivity` управляет semantic eligibility. `detectionThreshold` выбирает только minimum reconstruction confidence: `0..0.33` — `weak`, `0.34..0.66` — `moderate`, `0.67..1` — `strong`. Semantic severity он не меняет.
+- У `partial` один смысл на каждом уровне. На кандидате он означает, что неполно свидетельство **по этому кандидату** (его регион оборван либо его текст усечён), и капит reconstruction confidence до `moderate`. Страничный `partial` коллектора — только диагностика: он попадает в статус скана и едет с кандидатом отдельным полем `pagePartial`, но уверенность не капит — упёршийся бюджет где-то ещё на странице не является свидетельством об этом кандидате.
+- Переполнение батча мутаций запрашивает ровно один полный рескан вместо потери необработанных корней.
 - Prompt splitting и trigger phrases получают один validated custom-literal catalog. Source pattern подготавливается только в памяти, после подготовки удаляется из module configuration и не логируется и не кэшируется.
 - Material change prompt findings или completeness создаёт coalesced page-status update. Cache хранит только authoritative count, revision, flags и до десяти localized `{ type, summary }` findings.
 
@@ -79,7 +80,6 @@
 
 ## Ключи конфигурации
 - `enabled`
-- `allowIntervention`
 - `sensitivity`
 - `detectionThreshold`
 
@@ -120,7 +120,9 @@
 - Модуль должен работать полностью локально.
 - Нельзя сохранять реконструированные текстовые цепочки за пределами локальной runtime-памяти.
 - Нужно избегать широкого сбора текста, который не нужен для активной эвристики.
-- Любое будущее активное вмешательство должно оставаться за `allowIntervention`.
+- Модуль остаётся пассивным: по принятой находке он отдаёт `emitFindingNode` с ЯКОРЕМ РЕГИОНА - контейнером, который коллектор уже считает границей региона, - и сам в страницу не пишет. Активное вмешательство закрыто гейтом `settings.activeRemediationEnabled` (по умолчанию выключен) и применяется слоем `js/intervention-layer.js`, который ставит метку РЯДОМ с якорем: метка внутри контейнера была бы вставкой нашего текста в тот самый блок, о котором мы отчитываемся.
+- Ссылки на якоря живут только внутри скана: собираются лишь при открытом гейте, ограничены потолком и стираются по завершении конфигурации скана - тот же контракт, по которому узлы не попадают в снапшоты.
+- Пауза сохраняет находки И идентичность кандидатов и регионов, поэтому возврат на неизменившуюся вкладку обходится без рескана (`keepsStateWhilePaused`). Идентичность обязана пережить паузу вместе с находками: без неё тот же элемент после возврата получил бы новый id, и первая же мутация завела бы ВТОРУЮ находку о том же регионе вместо обновления первой.
 
 ## Следующие шаги
 - Завершить real-Chrome lifecycle acceptance с 50+ восстановленными вкладками, несколькими окнами, быстрым переключением и sustained SPA mutations.

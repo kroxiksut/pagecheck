@@ -1,11 +1,63 @@
+const NON_TEXT_CANDIDATE_TAGS = ['script', 'style', 'noscript', 'template'];
+
 export function hasCandidateText(element) {
     const tagName = element.tagName?.toLowerCase();
-    if (!tagName || ['script', 'style', 'noscript', 'template'].includes(tagName)) {
+    if (!tagName || NON_TEXT_CANDIDATE_TAGS.includes(tagName)) {
         return false;
     }
 
-    const text = getNormalizedText(element);
-    return Boolean(text && text.length > 1);
+    return hasNonWhitespaceText(element, 2);
+}
+
+// Answers "does this subtree hold at least `minChars` non-whitespace characters" without ever
+// materialising the text. It replaces getNormalizedText(element).length comparisons on the hot
+// candidate path: textContent is O(subtree text) and the traversal runs top-down, so asking it on
+// every element made the cost quadratic in page text (TASKS 8.1).
+// Equivalence with the normalizer it replaces: collapsing whitespace runs and trimming yields a
+// string of length 0 for zero non-whitespace characters, exactly 1 for one, and >= 2 for two or
+// more - so `normalized.length > 1` is the same predicate as `minChars = 2`, and `length === 0` is
+// the negation of `minChars = 1`. String.prototype.trim() strips the same character class the
+// /\s+/g normalizer does (NBSP and U+FEFF included), which is why a trimmed text node can be
+// scored without inspecting characters one by one.
+// `minChars` is honoured for any value: the walk stops as soon as the quota is met, so the cost is
+// bounded by the quota rather than by the size of the subtree. What it counts is non-whitespace
+// characters, which is NOT the same number as a normalized-string length - the latter also counts
+// the single spaces a normalizer leaves between words. Deliberate where the question is "is there
+// enough content here to matter": spaces are not content (TASKS 9.5).
+export function hasNonWhitespaceText(element, minChars = 1) {
+    const required = Math.max(1, minChars);
+    // The candidate probe (`required <= 2`) is the hot path - it runs on every element of the page,
+    // so it stays on the coarse credit: a trimmed node of length >= 2 fills the quota outright and
+    // its characters are never inspected. Larger quotas do count the characters, because there the
+    // whitespace inside a single text node would otherwise inflate the answer.
+    const countsExactly = required > 2;
+    let found = 0;
+    const pending = [element];
+
+    while (pending.length > 0) {
+        const node = pending.pop();
+        const childNodes = node.childNodes;
+        if (!childNodes) {
+            continue;
+        }
+
+        for (let index = childNodes.length - 1; index >= 0; index -= 1) {
+            const child = childNodes[index];
+            if (child.nodeType === 3) {
+                const trimmed = (child.data || '').trim();
+                if (trimmed.length > 0) {
+                    found += countsExactly ? trimmed.replace(/\s+/g, '').length : Math.min(trimmed.length, 2);
+                    if (found >= required) {
+                        return true;
+                    }
+                }
+            } else if (child.nodeType === 1) {
+                pending.push(child);
+            }
+        }
+    }
+
+    return found >= required;
 }
 
 export function isInputSurface(element) {
@@ -94,6 +146,10 @@ export function isLikelyOverlay(style, element, rect, viewport) {
         && style.pointerEvents !== 'none';
 }
 
+// Scale suppression is NOT part of this signal set (TASKS 8.9). The `transform.includes('scale(0')`
+// test that used to be here could never fire - computed transforms serialise as matrix(...) - and
+// the specialised scanTransformSuppression path already covers scale suppression properly, with
+// context, benign signals and severity of its own.
 export function hasStyleObfuscationSignals(style, element) {
     const hasBlendOrFilter = style.mixBlendMode !== 'normal'
         || (style.filter && style.filter !== 'none');
@@ -102,7 +158,6 @@ export function hasStyleObfuscationSignals(style, element) {
 
     return hasBlendOrFilter
         || hasClipping
-        || style.transform.includes('scale(0')
         || (element.hasAttribute('aria-hidden') && hasCandidateText(element));
 }
 

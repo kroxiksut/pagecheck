@@ -22,10 +22,17 @@ import {
 } from './utils/domUtils.js';
 import { dedupeFindings, normalizeFindings } from './utils/findingFactory.js';
 
+// Share of one scan's time budget the candidate classification pass may consume before the
+// detection pass starts on its own clock (TASKS 8.3).
+const CLASSIFICATION_BUDGET_SHARE = 0.25;
+
 export default class VisualManipulationDetector extends ModuleCore {
     constructor() {
         super('Hidden-Content-Visual-Manipulation', true);
         this.usesMutationObserver = true;
+        // Пауза сохраняет находки (см. onPause), поэтому рантайм имеет право вернуть модуль без
+        // рескана, когда документ за время паузы не менялся (C2, контракт resume в ModuleCore).
+        this.keepsStateWhilePaused = true;
         this.maxRecordedFindings = 20;
         this.recentFindings = [];
         this.totalFindingsCurrentScan = 0;
@@ -71,6 +78,7 @@ export default class VisualManipulationDetector extends ModuleCore {
             return;
         }
 
+        this.resetErrorState();
         const startTime = performance.now();
         if (this.mutationBatchTimer !== null) {
             clearTimeout(this.mutationBatchTimer);
@@ -94,7 +102,11 @@ export default class VisualManipulationDetector extends ModuleCore {
         try {
             const candidates = [];
             let traversedElements = 0;
-            const traversalStartedAt = performance.now();
+            // Бюджеты этого модуля считаются по АКТИВНОЙ работе: обход и анализ уступают
+            // event-loop, а стенные часы включали бы в бюджет чужое время (C2).
+            this.resetSliceAccounting();
+            this.beginWorkSlice();
+            const traversalBudgetMs = this.initialTraversalTimeBudgetMs;
             const traversalLimit = Math.min(
                 this.maxInitialTraversalElements,
                 Math.max(1000, this.candidateBudget * 20)
@@ -102,16 +114,28 @@ export default class VisualManipulationDetector extends ModuleCore {
             const pendingElements = document.documentElement ? [document.documentElement] : [];
 
             while (pendingElements.length > 0 && traversedElements < traversalLimit) {
-                if (performance.now() - traversalStartedAt >= this.initialTraversalTimeBudgetMs) {
+                if (this.getScanActiveMs() >= traversalBudgetMs) {
                     this.scanTimeBudgetReached += 1;
                     this.partialResult = true;
                     break;
                 }
+                // Потолок синхронного куска: обход самой тяжёлой страницы не имеет права быть одним
+                // длинным таском в main-thread пользователя (C2).
+                if (this.shouldYieldSlice()) {
+                    await this.yieldSlice();
+                    if (!this.isEnabled) {
+                        this.partialResult = true;
+                        break;
+                    }
+                }
 
                 const element = pendingElements.pop();
                 traversedElements += 1;
-                if (this.getCandidatePriority(element) > 0) {
-                    candidates.push(element);
+                // The priority computed here is carried into scanCandidates instead of being
+                // thrown away and recomputed there (TASKS 8.2).
+                const priority = this.getCandidatePriority(element);
+                if (priority > 0) {
+                    candidates.push([element, priority]);
                 }
 
                 for (let index = element.children.length - 1; index >= 0; index -= 1) {
@@ -123,32 +147,44 @@ export default class VisualManipulationDetector extends ModuleCore {
                 this.traversalElementsSkipped += pendingElements.length;
                 this.partialResult = true;
             }
-            this.scanCandidates(candidates, this.initialAnalysisTimeBudgetMs);
+            await this.scanCandidates(candidates, this.initialAnalysisTimeBudgetMs);
 
             const duration = performance.now() - startTime;
             this.stats.elementsScanned = traversedElements;
             this.stats.totalScanTime = duration;
             this.stats.lastScanTime = duration;
-            Logger.info(`[${this.moduleName}] Scan completed with ${this.totalFindingsCurrentScan} findings from ${this.candidatesInspected} candidates`);
+            const completion = this.partialResult
+                ? `truncated (timeBudgetHits=${this.scanTimeBudgetReached}, skippedElements=${this.traversalElementsSkipped})`
+                : 'completed';
+            Logger.info(`[${this.moduleName}] Scan ${completion} with ${this.totalFindingsCurrentScan} findings from ${this.candidatesInspected} candidates`);
         } catch (error) {
-            Logger.error(`[${this.moduleName}] First scan failed:`, error);
-            throw error;
+            // Level 2 (C5.6): the page could not be scanned, the module stays alive. Rethrowing
+            // used to reach ModuleCore.init(), whose catch destroyed the module for the whole page.
+            this.recordScanFailure('first-scan', error);
+            this.partialResult = true;
         }
     }
 
     async performScan() {
-        await this.firstScan();
-        return {
-            module: this.moduleName,
-            threatsDetected: this.totalFindingsCurrentScan,
-            findings: this.recentFindings.slice(0, 10),
-            partialResult: this.partialResult,
-            stats: this.getStats()
-        };
+        // Gate plus the level-2 error handler, shared by every module (C7.3).
+        await this.runExplicitScan();
+        // Форма снапшота живёт в ядре (C1); отсюда - только содержимое.
+        return this.buildScanSnapshot();
+    }
+
+    // Находки этого модуля живут не в stats.threatsDetected, а в счётчике текущего скана.
+    getFindingCount() {
+        return Math.max(0, Math.trunc(Number(this.totalFindingsCurrentScan) || 0));
     }
 
     scanElement(element, knownPriority = null) {
         if (!(element instanceof Element) || !this.isEnabled) {
+            return;
+        }
+
+        // Loop-safety (C4): узел, вставленный расширением, кандидатом быть не может - иначе
+        // наша собственная метка становится находкой, а находка - поводом для следующей метки.
+        if (this.isExtensionOwnedElement(element)) {
             return;
         }
 
@@ -219,9 +255,16 @@ export default class VisualManipulationDetector extends ModuleCore {
                 return !dedupeKey;
             }
 
-            if (this.seenDedupeKeys.size < this.maxDedupeKeys) {
-                this.seenDedupeKeys.add(dedupeKey);
+            // Evict the oldest key instead of quietly leaving the set full (TASKS 8.10). Refusing
+            // to record new keys used to disable cross-batch dedupe altogether: the findings were
+            // still accepted, so a long-lived SPA kept re-reporting the same nodes and
+            // threatsDetected grew without bound. A Set iterates in insertion order, so taking the
+            // first entry is FIFO; a repeat hit deliberately does not refresh a key's age.
+            if (this.seenDedupeKeys.size >= this.maxDedupeKeys) {
+                const oldestKey = this.seenDedupeKeys.values().next().value;
+                this.seenDedupeKeys.delete(oldestKey);
             }
+            this.seenDedupeKeys.add(dedupeKey);
             return true;
         });
 
@@ -231,7 +274,12 @@ export default class VisualManipulationDetector extends ModuleCore {
 
         this.stats.threatsDetected += acceptedFindings.length;
         this.totalFindingsCurrentScan += acceptedFindings.length;
-        acceptedFindings.forEach((finding) => this.recordFinding(finding));
+        acceptedFindings.forEach((finding) => {
+            this.recordFinding(finding);
+            // C4.3: узел отдаётся ровно здесь и только здесь - в момент, когда находка принята.
+            // Дальше он живёт в очереди намерений слоя и не переживает скан.
+            this.emitFindingNode(finding, element);
+        });
     }
 
     getPseudoStyle(context, pseudoElement) {
@@ -255,8 +303,14 @@ export default class VisualManipulationDetector extends ModuleCore {
         return pseudoStyle;
     }
 
-    handleMutations(mutations) {
+    handleMutations(rawMutations) {
         if (!this.isEnabled) {
+            return;
+        }
+
+        // Loop-safety (C4): наши собственные правки не работа страницы.
+        const mutations = this.filterForeignMutations(rawMutations);
+        if (mutations.length === 0) {
             return;
         }
 
@@ -293,8 +347,10 @@ export default class VisualManipulationDetector extends ModuleCore {
             || mutation.addedNodes.length > 0;
     }
 
-    processMutationBatch(mutations) {
+    async processMutationBatch(mutations) {
         const startTime = performance.now();
+        this.resetSliceAccounting();
+        this.beginWorkSlice();
 
         try {
             const candidates = new Set();
@@ -351,8 +407,9 @@ export default class VisualManipulationDetector extends ModuleCore {
                 this.partialResult = true;
             }
             this.stats.elementsScanned += traversedElements;
-            this.scanCandidates([...candidates], this.mutationAnalysisTimeBudgetMs);
+            await this.scanCandidates([...candidates].map((element) => [element, null]), this.mutationAnalysisTimeBudgetMs);
 
+            this.finishWorkSlice();
             const duration = performance.now() - startTime;
             this.stats.totalScanTime += duration;
             this.stats.lastScanTime = duration;
@@ -367,43 +424,88 @@ export default class VisualManipulationDetector extends ModuleCore {
         this.candidateBudget = this.resolveCandidateBudget();
     }
 
-    scanCandidates(candidates, timeBudgetMs = this.initialAnalysisTimeBudgetMs) {
-        const startedAt = performance.now();
+    // `entries` are [element, priority] pairs; a null priority means "not classified yet" and comes
+    // from the mutation path, where candidates are collected without a priority pass.
+    // Classification and detection get SEPARATE clocks (TASKS 8.3). With one shared clock a
+    // text-heavy page could spend the whole budget classifying and then return from the very first
+    // detection check - zero elements scanned, zero findings, and a log line claiming success.
+    // The two shares add up to the caller's budget, so total scan time is unchanged.
+    async scanCandidates(entries, timeBudgetMs = this.initialAnalysisTimeBudgetMs) {
+        const classificationBudgetMs = timeBudgetMs * CLASSIFICATION_BUDGET_SHARE;
+        const detectionBudgetMs = timeBudgetMs - classificationBudgetMs;
+        const classificationStartedAt = this.getScanActiveMs();
         const priorityBuckets = [[], [], [], []];
         this.currentScanCache = {
             styles: new Map(),
             rects: new Map(),
             points: new Map(),
             paths: new Map(),
+            texts: new Map(),
             viewportSize: null
         };
 
         try {
-            for (const element of candidates) {
-                if (performance.now() - startedAt >= timeBudgetMs) {
+            for (const [element, knownPriority] of entries) {
+                if (this.getScanActiveMs() - classificationStartedAt >= classificationBudgetMs) {
                     this.scanTimeBudgetReached += 1;
                     this.partialResult = true;
                     break;
                 }
-                const priority = this.getCandidatePriority(element);
+                if (this.shouldYieldSlice()) {
+                    await this.yieldSlice();
+                    if (!this.isEnabled) {
+                        this.partialResult = true;
+                        break;
+                    }
+                }
+                const priority = knownPriority ?? this.getCandidatePriority(element);
                 if (priority > 0) {
                     priorityBuckets[priority].push(element);
                 }
             }
 
+            const detectionStartedAt = this.getScanActiveMs();
             for (let priority = 3; priority >= 1; priority -= 1) {
                 for (const element of priorityBuckets[priority]) {
-                    if (performance.now() - startedAt >= timeBudgetMs) {
+                    if (this.getScanActiveMs() - detectionStartedAt >= detectionBudgetMs) {
                         this.scanTimeBudgetReached += 1;
                         this.partialResult = true;
                         return;
                     }
-                    this.scanElement(element, priority);
+                    if (this.shouldYieldSlice()) {
+                        await this.yieldSlice();
+                        if (!this.isEnabled) {
+                            this.partialResult = true;
+                            return;
+                        }
+                    }
+                    // Level 1 (C5.6): one bad candidate costs one candidate, not the scan.
+                    try {
+                        this.scanElement(element, priority);
+                    } catch (error) {
+                        this.recordUnitError('scan-element', error);
+                        this.partialResult = true;
+                    }
                 }
             }
         } finally {
             this.currentScanCache = null;
         }
+    }
+
+    // Кэш стилей, rect'ов и геометрии построен на «DOM статичен». Между кусками это перестаёт быть
+    // правдой, поэтому инвариант держится per-slice, а не per-scan (C2; visual-manipulation 6.1).
+    onSliceYield() {
+        const cache = this.currentScanCache;
+        if (!cache) {
+            return;
+        }
+        cache.styles.clear();
+        cache.rects.clear();
+        cache.points.clear();
+        cache.paths.clear();
+        cache.texts.clear();
+        cache.viewportSize = null;
     }
 
     getCandidatePriority(element) {
@@ -452,7 +554,7 @@ export default class VisualManipulationDetector extends ModuleCore {
         }
 
         const delay = Math.max(0, this.resolveScanInterval() - (Date.now() - this.lastMutationBatchTime));
-        this.mutationBatchTimer = setTimeout(() => {
+        this.mutationBatchTimer = setTimeout(async () => {
             this.mutationBatchTimer = null;
             const mutations = this.pendingMutations.splice(0);
             if (mutations.length === 0 || !this.isEnabled) {
@@ -462,7 +564,8 @@ export default class VisualManipulationDetector extends ModuleCore {
             this.lastMutationBatchTime = Date.now();
             this.beginCandidateBatch();
             this.pseudoStyleLookupsRemaining = this.mutationPseudoStyleLookupLimit;
-            this.processMutationBatch(mutations);
+            // Через гейт C5.1: батч теперь уступает event-loop и может чередоваться с полным сканом.
+            await this.runGuardedScan('mutation-batch', () => this.processMutationBatch(mutations));
             this.onMutationsProcessed(mutations);
 
             if (this.pendingMutations.length > 0) {
@@ -482,6 +585,20 @@ export default class VisualManipulationDetector extends ModuleCore {
     }
 
     onDestroy() {
+        this.stopScheduledWork();
+    }
+
+    // Пауза оставляет результаты и снимает всё остальное. Уходит то, что либо сработает в фоновой
+    // вкладке (таймер и очередь мутаций), либо верно лишь пока DOM заведомо не двигался (scan-local
+    // кэш стилей и контекст разбора цвета). Остаются находки и их ключи дедупликации: они описывают
+    // страницу, а страница никуда не делась. Отдельный хук, а не наследование onDestroy: инвариант
+    // «на паузе находки живут» - предпосылка resume без рескана, и он должен ломаться заметно, а не
+    // тихо через правку соседнего метода.
+    onPause() {
+        this.stopScheduledWork();
+    }
+
+    stopScheduledWork() {
         if (this.mutationBatchTimer !== null) {
             clearTimeout(this.mutationBatchTimer);
             this.mutationBatchTimer = null;
@@ -507,11 +624,11 @@ export default class VisualManipulationDetector extends ModuleCore {
     // their scan context. The split is by what a function reads, not by taste:
     //  - Cache-aware wrappers (must be used, never bypassed): getComputedStyle, getRect,
     //    elementsFromPoint, getElementPath, getViewportSize, getRootFontSizePx,
-    //    resolveViewportGeometry, getColorParser.
+    //    resolveViewportGeometry, getColorParser, hasCandidateText.
     //  - Predicate wrappers that combine style with geometry: isVisuallyHidden, isInputHidden,
     //    isLikelyOverlay, isOffscreen - they take the element, resolve the rect here, and hand pure
     //    data to utils/domUtils.js.
-    //  - Plain delegates over pure helpers: hasCandidateText, isInputSurface, isOverlayNamed,
+    //  - Plain delegates over pure helpers: isInputSurface, isOverlayNamed,
     //    hasStyleObfuscationSignals, describeElement.
     // A detector MAY import from utils/domUtils.js directly, but ONLY functions that do not read
     // layout - getElementMarker, getNormalizedText, isPasswordInput, resolveZIndex, findHidingSource
@@ -617,8 +734,20 @@ export default class VisualManipulationDetector extends ModuleCore {
         return this.colorParserContext;
     }
 
+    // Cache-aware: the answer is asked again by the hidden-text gate and by the style-obfuscation
+    // fallbacks for the same element within one scan (TASKS 8.1).
     hasCandidateText(element) {
-        return hasCandidateText(element);
+        const cache = this.currentScanCache;
+        if (!cache) {
+            return hasCandidateText(element);
+        }
+
+        let result = cache.texts.get(element);
+        if (result === undefined) {
+            result = hasCandidateText(element);
+            cache.texts.set(element, result);
+        }
+        return result;
     }
 
     isInputSurface(element) {

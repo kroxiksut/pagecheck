@@ -24,7 +24,8 @@ export function inspectVisibleTargetMismatch({ element, targetUrl, linkText, hos
                 ? (chrome.i18n.getMessage('findingLinkMismatchDetails', [mismatch.visibleHostname, mismatch.targetHostname, module.describeElement(element)]) || `visibleHostname=${mismatch.visibleHostname}; targetHostname=${mismatch.targetHostname}; ${module.describeElement(element)}`)
                 : `visibleHostname=${mismatch.visibleHostname}; targetHostname=${mismatch.targetHostname}; ${module.describeElement(element)}`,
             severity: 'high',
-            detector: 'visibleMismatchDetector'
+            detector: 'visibleMismatchDetector',
+            dedupeKey: `link-mismatch|${mismatch.visibleHostname}|${mismatch.targetHostname}`
         })
     ];
 }

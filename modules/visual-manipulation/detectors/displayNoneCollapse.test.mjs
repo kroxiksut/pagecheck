@@ -77,10 +77,15 @@ const makeNode = ({
         id,
         className,
         attributes,
+        nodeType: 1,
         style: inline,
         computed: { ...BASE_COMPUTED, ...computed },
         rect: { left: 0, top: 0, right: 200, bottom: 40, width: 200, height: 40 },
         textContent: text,
+        // Текстовые узлы держатся в синхроне с textContent: детектор спрашивает объём текста
+        // ограниченным обходом childNodes (та же дорога, что у hasCandidateText в проде), поэтому
+        // узел, у которого есть textContent и нет текстового ребёнка, - не модель, а артефакт стенда.
+        childNodes: text ? [{ nodeType: 3, data: text }] : [],
         clientWidth: 200,
         scrollWidth: 200,
         parentElement: null,
@@ -108,6 +113,7 @@ const makeNode = ({
 const appendChild = (parent, child) => {
     child.parentElement = parent;
     parent.children.push(child);
+    parent.childNodes.push(child);
     return child;
 };
 

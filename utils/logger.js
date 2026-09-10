@@ -6,10 +6,28 @@ class Logger {
     static maxHistorySize = 1000;
     static sensitiveKeywords = ['password', 'token', 'key', 'secret', 'auth', 'custompatterns'];
 
+    // Уровни логирования. Значение слева пропускает всё, что не больше по числу;
+    // 'silent' обрабатывается отдельно в shouldLog.
+    static levels = { error: 0, warn: 1, info: 2, debug: 3 };
+    static validLevels = ['error', 'warn', 'info', 'debug', 'silent'];
+
     // Инициализация логгера
     static init(config = {}) {
-        if (config.logLevel) {
-            this.logLevel = config.logLevel;
+        // init присваивал config.logLevel без проверки, в отличие от setLevel. Неизвестный уровень
+        // давал levels[this.logLevel] === undefined, а сравнение 0 <= undefined - false, поэтому
+        // глушились ВСЕ уровни, включая error: логгер отключал именно тот канал, по которому его
+        // поломку можно было бы заметить. Валидируем как в setLevel и падаем на 'error', а не в
+        // тишину (TASKS C6.8).
+        if (config.logLevel !== undefined) {
+            if (this.validLevels.includes(config.logLevel)) {
+                this.logLevel = config.logLevel;
+            } else {
+                const rejectedLevel = config.logLevel;
+                this.logLevel = 'error';
+                // Именно error, а не warn: после отката уровня warn уже не проходит, и
+                // единственное сообщение о причине потери логов исчезло бы вместе с ними.
+                this.error(`Invalid log level: ${rejectedLevel}. Falling back to 'error'.`);
+            }
         }
         this.isProduction = config.isProduction || false;
         this.maxHistorySize = config.maxHistorySize || 1000;
@@ -23,7 +41,7 @@ class Logger {
 
     // Установка уровня логирования
     static setLevel(level) {
-        const validLevels = ['error', 'warn', 'info', 'debug', 'silent'];
+        const validLevels = this.validLevels;
         if (validLevels.includes(level)) {
             this.logLevel = level;
             this.debug(`Log level changed to: ${level}`);
@@ -85,14 +103,12 @@ class Logger {
     static shouldLog(level) {
         if (this.logLevel === 'silent') return false;
 
-        const levels = {
-            error: 0,
-            warn: 1,
-            info: 2,
-            debug: 3
-        };
+        const levels = this.levels;
+        // Второй рубеж на случай прямого присваивания полю в обход init/setLevel: неизвестный
+        // уровень не должен глушить ошибки.
+        const threshold = Object.hasOwn(levels, this.logLevel) ? levels[this.logLevel] : levels.error;
 
-        return levels[level] <= levels[this.logLevel];
+        return levels[level] <= threshold;
     }
 
     // Обработка аргументов

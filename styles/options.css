@@ -47,6 +47,9 @@ body.pagecheck-theme-dark {
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+/* body.pagecheck-theme-auto: промежуточная палитра, пока грузится файл темы, и палитра
+   аварийного пути ThemeManager.loadFallbackTheme(), где таблица стилей остаётся пустой.
+   В обычном режиме класс живёт доли секунды - это не мёртвые правила (TASKS C6.9). */
 body.pagecheck-theme-auto {
     --primary-color: #1a73e8;
     --primary-hover: #1967d2;

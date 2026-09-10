@@ -188,7 +188,7 @@ export const I18n = {
     getDefaultLanguage() {
         try {
             const browserLang = this.getBrowserLanguage();
-            const baseLang = browserLang.split('-')[0]; // en-US в†’ en
+            const baseLang = browserLang.split('-')[0]; // en-US → en
 
             if (this.isLanguageSupported(baseLang)) {
                 this.currentLanguage = baseLang;

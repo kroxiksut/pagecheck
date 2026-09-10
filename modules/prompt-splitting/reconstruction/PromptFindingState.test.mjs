@@ -97,4 +97,54 @@ assert.equal(limitedCommit.status, 'partial');
 assert.equal(limitedState.getSnapshot().activeCount, 1);
 assert.equal(limitedState.getSnapshot().partialResult, true);
 
+
+// --- Ответ recordDecision: принято или отброшено (C4.3) -----------------------------------------
+// Метод возвращал undefined на всех путях, и «находка принята» было неотличимо от «отброшена по
+// лимиту». Ответ нужен вызывающему: узел региона отдаётся слою вмешательства ТОЛЬКО по принятой
+// находке, иначе страница получила бы метку о находке, которой в отчёте нет.
+
+const answerState = new PromptFindingState();
+const answerBatch = answerState.beginBatch({ scope: 'full', regionIds: ['region-answer'] });
+
+assert.equal(
+    answerState.recordDecision(answerBatch, decision(), evidence('region-answer', ['candidate-1', 'candidate-2'])),
+    true,
+    'новая находка обязана отвечать «принято»'
+);
+assert.equal(
+    answerState.recordDecision(answerBatch, decision({ reconstructionConfidence: 'moderate' }), evidence('region-answer', ['candidate-2', 'candidate-3'])),
+    true,
+    'слияние с существующей находкой - это тоже принятие: находка в отчёте есть'
+);
+assert.equal(
+    answerState.recordDecision(answerBatch, decision({ eligibility: 'suppressed' }), evidence('region-answer', ['candidate-1', 'candidate-2'])),
+    false,
+    'подавленное решение находкой не становится'
+);
+assert.equal(
+    answerState.recordDecision(answerBatch, decision(), evidence('region-answer', ['candidate-9'])),
+    false,
+    'решение с одним вкладчиком отбрасывается: распределённого промпта из одного куска не бывает'
+);
+assert.equal(
+    answerState.recordDecision(answerBatch, decision(), { regionId: '', candidateIds: ['a', 'b'], contributingCandidateIds: ['a', 'b'] }),
+    false,
+    'решение без региона отбрасывается'
+);
+
+// Отказ по лимиту - это `partial`, а не находка, и отвечать он обязан «не принято».
+const cappedState = new PromptFindingState({ maxPendingFindings: 1 });
+const cappedBatch = cappedState.beginBatch({ scope: 'full', regionIds: ['region-1', 'region-2'] });
+assert.equal(
+    cappedState.recordDecision(cappedBatch, decision(), evidence('region-1', ['candidate-1', 'candidate-2'])),
+    true,
+    'первая находка помещается в батч'
+);
+assert.equal(
+    cappedState.recordDecision(cappedBatch, decision({ actionGroup: 'other.group' }), evidence('region-2', ['candidate-3', 'candidate-4'])),
+    false,
+    'находка, не поместившаяся в батч, обязана отвечать «не принято» - иначе слой пометит регион, о котором мы не отчитались'
+);
+assert.equal(cappedBatch.partial, true, 'отказ по лимиту обязан взводить partial');
+
 console.log('PromptFindingState Priority 6 checks passed.');

@@ -5,12 +5,36 @@ import {
     prepareCustomLiteralCatalog
 } from '../semantic-analysis/SemanticAnalysisCore.js';
 
+// @data-list Теги-контейнеры текста из HTML; устаревают со спецификацией. Устаревание =
+// ТИШИНА: текст в новом теге не получит кандидата ни на одном уровне - ровно дефект 10.2,
+// из-за которого в fallback-набор пришлось добавлять nav, form, figure, details и body.
 const PRIMARY_TEXT_CONTAINERS = new Set([
     'p', 'li', 'blockquote', 'figcaption', 'caption', 'td', 'th', 'dt', 'dd',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
 ]);
 const INTERACTIVE_TEXT_CONTAINERS = new Set(['a', 'button', 'summary', 'label']);
-const FALLBACK_TEXT_CONTAINERS = new Set(['div', 'section', 'article', 'aside', 'main', 'header', 'footer']);
+// @data-list (см. комментарий ниже: что это, чем оборачивается устаревание)
+// nav, form, figure, details, fieldset и body добавлены по 10.2: у текста, чей ближайший
+// контейнер-предок не входит ни в один набор, кандидата не существовало НИ НА ОДНОМ уровне -
+// `<nav><span>...</span></nav>` и вставка прямо в body были невидимы для детектора целиком, и это
+// дыра в отборе кандидатов, которую не закрывает никакая настройка чувствительности.
+// body здесь терминальный контейнер: его собственный текст ограничен maxCandidateRawCharacters,
+// как у любого другого fallback-контейнера.
+const FALLBACK_TEXT_CONTAINERS = new Set([
+    'div', 'section', 'article', 'aside', 'main', 'header', 'footer',
+    'nav', 'form', 'figure', 'details', 'fieldset', 'body'
+]);
+// Объединённый набор контейнеров для подъёма mutation root (10.1). Отдельная константа, а не
+// три проверки подряд: подъём отвечает на вопрос «кто владеет текстом», а не «кандидат ли это» -
+// последнее решает processMutationBatch, потому что внутри колбэка observer нельзя собирать
+// текст поддерева.
+const CANDIDATE_CONTAINER_TAGS = new Set([
+    ...PRIMARY_TEXT_CONTAINERS,
+    ...INTERACTIVE_TEXT_CONTAINERS,
+    ...FALLBACK_TEXT_CONTAINERS
+]);
+// @data-list Технические теги, чей текст не контент. Устаревание = ШУМ: содержимое нового
+// технического тега пойдёт в анализ как обычный текст.
 const TECHNICAL_TAGS = new Set(['script', 'style', 'noscript', 'template', 'head', 'meta', 'link', 'base', 'title']);
 const FORM_CONTROL_SELECTOR = 'input, textarea, select, option, optgroup';
 const ACTIVE_EDITABLE_SELECTOR = '[contenteditable]:not([contenteditable="false"]), [role="textbox" i]';
@@ -19,6 +43,9 @@ export default class TriggerPhrases extends ModuleCore {
     constructor() {
         super('Trigger-Phrases', true);
         this.usesMutationObserver = true;
+        // Пауза сохраняет находки (см. onPause), поэтому рантайм имеет право вернуть модуль без
+        // рескана, когда документ за время паузы не менялся (C2, контракт resume в ModuleCore).
+        this.keepsStateWhilePaused = true;
         this.maxRecordedFindings = 20;
         this.maxInitialCandidates = 3000;
         this.maxMutationCandidates = 300;
@@ -74,7 +101,11 @@ export default class TriggerPhrases extends ModuleCore {
         this.lastScanErrorCode = null;
         this.recentFindings = [];
         this.pendingMutationRoots = [];
+        // Зеркало очереди: проверка «этот корень уже стоит» за O(1) вместо прохода по массиву (10.8).
+        this.pendingMutationRootSet = new Set();
         this.mutationQueueRequiresFullRescan = false;
+        this.remainingCleanupBudget = this.maxMutationCleanupElements;
+        this.maxMutationRootAscent = 8;
         this.mutationQueueHighWaterMark = 0;
         this.coalescedMutationRoots = 0;
         this.mutationQueueOverflows = 0;
@@ -98,9 +129,10 @@ export default class TriggerPhrases extends ModuleCore {
         this.currentScanActiveProcessingMs = 0;
         this.currentWorkSliceStartedAt = null;
         this.currentScanDeadline = Number.POSITIVE_INFINITY;
+        // Расширяем дефолт ядра, а не перезаписываем его: перезапись молча теряет любое поле,
+        // которое ядро добавит позже (C1, разбор 2026-09-09).
         this.observerConfig = {
-            childList: true,
-            subtree: true,
+            ...this.observerConfig,
             attributes: true,
             characterData: true,
             attributeFilter: ['title', 'aria-label', 'alt', 'contenteditable', 'role', 'aria-multiline', 'type']
@@ -167,6 +199,17 @@ export default class TriggerPhrases extends ModuleCore {
                 }
             } while (scanResult === 'yield');
 
+            // 10.5: реконсиляция гоняет mutation-батч, а beginCandidateBatch внутри него обнуляет
+            // candidatesAnalyzed, currentElementsVisited, currentRuleEvaluations и
+            // normalizedCharactersAnalyzed. Управление возвращается сюда уже с цифрами крошечного
+            // батча реконсиляции, и лог с getStats() описывали ими первичный скан. Счётчики
+            // снимаются ДО реконсиляции и возвращаются перед отчётом.
+            const initialScanCounters = {
+                candidatesAnalyzed: this.candidatesAnalyzed,
+                currentElementsVisited: this.currentElementsVisited,
+                currentRuleEvaluations: this.currentRuleEvaluations,
+                normalizedCharactersAnalyzed: this.normalizedCharactersAnalyzed
+            };
             const reconciliationResult = await this.reconcileInitialMutationQueue(
                 initialScanState,
                 scanConfiguration,
@@ -181,9 +224,17 @@ export default class TriggerPhrases extends ModuleCore {
                 this.lastScanStatus = 'aborted';
                 return;
             }
+
+            // Отчёт ниже описывает первичный скан, а не батч реконсиляции (10.5).
+            this.candidatesAnalyzed = initialScanCounters.candidatesAnalyzed;
+            this.currentElementsVisited = initialScanCounters.currentElementsVisited;
+            this.currentRuleEvaluations = initialScanCounters.currentRuleEvaluations;
+            this.normalizedCharactersAnalyzed = initialScanCounters.normalizedCharactersAnalyzed;
             const duration = performance.now() - startTime;
             this.stats.lastScanTime = duration;
-            this.stats.totalScanTime = duration;
+            // Накапливается, а не перезаписывается (10.5): «суммарное время сканирования»,
+            // равное длительности последнего скана, - это не сумма, а второе имя lastScanTime.
+            this.stats.totalScanTime += duration;
             this.logCandidateLimitWarning();
             this.lastScanStatus = this.getFindingSnapshotState().partialResult ? 'partial' : 'complete';
             Logger.info(`[${this.moduleName}] Candidate scan completed: ${this.stats.elementsScanned} elements, ${this.candidatesAnalyzed} candidates, ${duration.toFixed(2)}ms`);
@@ -215,7 +266,7 @@ export default class TriggerPhrases extends ModuleCore {
             return 'aborted';
         }
 
-        const roots = this.pendingMutationRoots.splice(0);
+        const roots = this.takePendingMutationRoots();
         const requiresFullRescan = this.mutationQueueRequiresFullRescan;
         this.mutationQueueRequiresFullRescan = false;
         if (roots.length === 0 && !requiresFullRescan) {
@@ -245,12 +296,25 @@ export default class TriggerPhrases extends ModuleCore {
     }
 
     async performScan() {
-        await this.firstScan();
+        // Gate plus the level-2 error handler, shared by every module (C7.3).
+        await this.runExplicitScan();
+        // Форма снапшота живёт в ядре (C1).
+        return this.buildScanSnapshot();
+    }
+
+    getFindingCount() {
+        return this.activeFindings.size;
+    }
+
+    // Этот модуль публикует НЕ recentFindings, а копию активных findings со своей диагностикой -
+    // именно из-за неё js/content.js держал особый случай, захардкоженный по ID модуля.
+    getSerializedFindings() {
+        const { findings, findingsTruncated, ...extra } = this.serializeActiveFindings();
         return {
-            module: this.moduleName,
-            threatsDetected: this.activeFindings.size,
-            ...this.serializeActiveFindings(),
-            stats: this.getStats()
+            findings,
+            findingsTruncated,
+            revision: Math.max(0, Math.trunc(Number(this.findingRevision) || 0)),
+            extra
         };
     }
 
@@ -265,7 +329,11 @@ export default class TriggerPhrases extends ModuleCore {
             return;
         }
 
-        if (this.isTechnicalElement(element) || this.isPrivacyExcluded(element)) {
+        // Loop-safety (C4): наша собственная метка не кандидат. Проверка стоит рядом с техническими
+        // и приватными исключениями, потому что вопрос тот же - «это вообще контент страницы?».
+        if (this.isExtensionOwnedElement(element)
+            || this.isTechnicalElement(element)
+            || this.isPrivacyExcluded(element)) {
             this.clearFindingsForElement(element);
             this.recordPerformanceStage('candidatePrefilterMs', prefilterStartTime);
             return;
@@ -313,11 +381,21 @@ export default class TriggerPhrases extends ModuleCore {
     }
 
     isInitialScanSliceBudgetReached(scanState) {
-        return performance.now() >= scanState.sliceDeadline
+        // shouldYieldSlice() - это общий потолок куска на вкладку и реакция на длинные таски
+        // (C2). Он стоит первым: собственные лимиты модуля могут быть щедрее, чем то, что сейчас
+        // может позволить себе страница.
+        return this.shouldYieldSlice()
+            || performance.now() >= scanState.sliceDeadline
             || this.currentElementsVisited - scanState.sliceElementsVisited >= this.initialScanSliceElementLimit
             || this.candidatesAnalyzed - scanState.sliceCandidatesAnalyzed >= this.initialScanSliceCandidateLimit
             || this.normalizedCharactersAnalyzed - scanState.sliceNormalizedCharacters >= this.initialScanSliceNormalizedCharacterBudget
             || this.currentRuleEvaluations - scanState.sliceRuleEvaluations >= this.initialScanSliceRuleEvaluationLimit;
+    }
+
+    // Ядро зовёт этот хук, когда уступает event-loop. У модуля он отменяемый: таймер и резолвер
+    // снимаются при остановке, иначе продолжение просыпалось бы уже после уничтожения скана.
+    scheduleSliceContinuation() {
+        return this.waitForInitialScanYield();
     }
 
     waitForInitialScanYield() {
@@ -682,8 +760,14 @@ export default class TriggerPhrases extends ModuleCore {
 
                 const normalizedCharacterCount = diagnostics.normalizedCharacters;
                 if (this.normalizedCharactersAnalyzed + normalizedCharacterCount > this.currentNormalizedCharacterBudget) {
-                    this.normalizedSegmentsSkippedByBudget += 1;
-                    continue;
+                    // 10.7: бюджет только убывает, поэтому ни один следующий сегмент этого
+                    // кандидата в него уже не поместится. `continue` прогонял каждый оставшийся
+                    // сегмент через NFC/NFKC и токенизацию Intl.Segmenter только затем, чтобы
+                    // упереться в ту же проверку: до ~16 впустую выполненных нормализаций на
+                    // кандидате в 65 КБ. Счётчик доначисляется на весь остаток, чтобы
+                    // диагностика осталась ровно прежней.
+                    this.normalizedSegmentsSkippedByBudget += candidateSegments.length - segmentIndex;
+                    break;
                 }
 
                 this.normalizedCharactersAnalyzed += normalizedCharacterCount;
@@ -929,7 +1013,6 @@ export default class TriggerPhrases extends ModuleCore {
             this.requestMutationFullRescan();
         }
 
-        let cleanupBudget = this.maxMutationCleanupElements;
         for (let index = 0; index < nodeLimit; index += 1) {
             const node = removedNodes[index];
             if (node.nodeType === Node.TEXT_NODE) {
@@ -939,9 +1022,20 @@ export default class TriggerPhrases extends ModuleCore {
                 continue;
             }
 
-            const cleanupResult = this.clearFindingsForSubtree(node, cleanupBudget, false);
-            cleanupBudget -= cleanupResult.elementsVisited;
-            if (!cleanupResult.complete || (cleanupBudget <= 0 && index + 1 < nodeLimit)) {
+            // Недоделанная очистка не теряется молча: она просит полный рескан, иначе получаем
+            // залипшие findings - тот же исход, что в 10.1.
+            if (this.remainingCleanupBudget <= 0) {
+                this.requestMutationFullRescan();
+                break;
+            }
+
+            const cleanupResult = this.clearFindingsForSubtree(
+                node,
+                this.remainingCleanupBudget,
+                false
+            );
+            this.remainingCleanupBudget -= cleanupResult.elementsVisited;
+            if (!cleanupResult.complete) {
                 this.requestMutationFullRescan();
                 break;
             }
@@ -1128,10 +1222,24 @@ export default class TriggerPhrases extends ModuleCore {
         return preferredEnd;
     }
 
-    handleMutations(mutations) {
+    handleMutations(rawMutations) {
         if (!this.isEnabled) {
             return;
         }
+
+        // Loop-safety (C4): наши собственные правки не работа страницы.
+        const mutations = this.filterForeignMutations(rawMutations);
+        if (mutations.length === 0) {
+            return;
+        }
+
+        // 10.3: бюджет очистки - ОДИН на батч, а не на запись. Он переинициализировался в
+        // clearFindingsForRemovedNodes, то есть на каждую childList-запись, а записей в батче
+        // до maxPendingMutationRoots: страница, сносящая много крупных поддеревьев за один тик
+        // (виртуализованный список, смена маршрута в SPA), получала до 200 x 1000 = 200 000
+        // посещений элементов синхронно внутри одного колбэка observer. README всё это время
+        // обещал «не более 1000 элементов на batch» - код реализовывал «на запись».
+        this.remainingCleanupBudget = this.maxMutationCleanupElements;
 
         const recordLimit = Math.min(mutations.length, this.maxPendingMutationRoots);
         if (mutations.length > recordLimit) {
@@ -1166,14 +1274,18 @@ export default class TriggerPhrases extends ModuleCore {
             for (let index = 0; index < addedNodeLimit; index += 1) {
                 const node = mutation.addedNodes[index];
                 if (node instanceof Element && node.isConnected) {
-                    this.enqueueMutationRoot(node);
+                    this.enqueueMutationRoot(this.resolveMutationRoot(node));
                 } else if (node.nodeType === Node.TEXT_NODE && target) {
-                    this.enqueueMutationRoot(target);
+                    this.enqueueMutationRoot(this.resolveMutationRoot(target));
                 }
             }
 
-            if (target && hasRemovedText) {
-                this.enqueueMutationRoot(target);
+            // Удаление ЭЛЕМЕНТА возвращает владельца в очередь наравне с удалением текстового
+            // узла (10.1). Раньше сюда попадал только hasRemovedText, а удалённый <span>
+            // текстовым узлом не является: finding, записанный на абзац, жил до конца жизни
+            // страницы - прямо вопреки обещанию README снимать findings с удалённых поддеревьев.
+            if (target && (hasRemovedText || mutation.removedNodes.length > 0)) {
+                this.enqueueMutationRoot(this.resolveMutationRoot(target));
             }
             return;
         }
@@ -1181,7 +1293,8 @@ export default class TriggerPhrases extends ModuleCore {
         if (mutation.type === 'characterData') {
             const parent = mutation.target.parentElement;
             if (parent?.isConnected) {
-                this.enqueueMutationRoot(parent);
+                // Тот же вопрос владения: правка текста внутри <span> принадлежит абзацу.
+                this.enqueueMutationRoot(this.resolveMutationRoot(parent));
             }
             return;
         }
@@ -1191,21 +1304,68 @@ export default class TriggerPhrases extends ModuleCore {
         }
     }
 
+    // 10.1: кандидат принадлежит ближайшему КОНТЕЙНЕРУ, а в очередь клался сам изменённый узел.
+    // Внедрённый в абзац <span> не входит ни в один набор контейнеров, поэтому не сканировалось
+    // ничего: ни span (не кандидат), ни p (заново не посещался) - внедрение inline-элемента в
+    // существующий абзац не детектилось вообще, до случайного полного рескана по другой причине.
+    // Подъём идёт ПО ТЕГУ, а не через isTextCandidateElement(): проверка собственного текста дала
+    // бы разные ответы до и после правки DOM, а вопрос здесь один - «кто владеет этим текстом».
+    // Узел, который сам является контейнером, не поднимается: иначе каждый добавленный <div>
+    // уезжал бы корнем в body и превращал любую мутацию в полный скан страницы.
+    resolveMutationRoot(node) {
+        if (!(node instanceof Element)) {
+            return node;
+        }
+
+        let current = node;
+        for (let depth = 0; depth < this.maxMutationRootAscent; depth += 1) {
+            if (!(current instanceof Element)) {
+                break;
+            }
+            if (CANDIDATE_CONTAINER_TAGS.has(current.localName)) {
+                return current;
+            }
+            current = current.parentElement;
+        }
+
+        // Владельца в пределах лимита нет - поведение прежнее, узел ставится как есть.
+        return node;
+    }
+
+    // 10.8: обе проверки родства были проходами по всей очереди с Node.contains(), то есть O(n²)
+    // на батч внутри колбэка observer - на том же тике, где работает очистка из 10.3.
+    // Вопрос «предок уже в очереди» дешевле задавать снизу вверх: подъём по цепочке родителей
+    // стоит O(глубины) и не зависит от длины очереди.
+    // Обратный проход, снимающий уже стоящих потомков нового корня, не убран, а перенесён: раз на
+    // батч и перед самым переполнением. Полностью перенести дедупликацию на обработку батча
+    // нельзя - очередь тогда временно держала бы потомков, maxPendingMutationRoots срабатывал бы
+    // чаще, и изменилась бы частота полных рескансов. Это поведение, а не только стоимость.
     enqueueMutationRoot(root) {
         if (!(root instanceof Element) || !root.isConnected) {
             return false;
         }
 
-        for (const queuedRoot of this.pendingMutationRoots) {
-            if (queuedRoot === root || queuedRoot.contains(root)) {
+        if (this.pendingMutationRootSet.has(root)) {
+            this.coalescedMutationRoots += 1;
+            return true;
+        }
+
+        for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
+            if (this.pendingMutationRootSet.has(ancestor)) {
                 this.coalescedMutationRoots += 1;
                 return true;
             }
         }
 
-        const previousRootCount = this.pendingMutationRoots.length;
-        this.pendingMutationRoots = this.pendingMutationRoots.filter((queuedRoot) => !root.contains(queuedRoot));
-        this.coalescedMutationRoots += previousRootCount - this.pendingMutationRoots.length;
+        if (this.pendingMutationRoots.length >= this.maxPendingMutationRoots) {
+            // Последний шанс до переполнения: часть очереди могла стать вложенной в корни,
+            // добавленные позже.
+            // Считая и входящий корень: без него проход перед переполнением бесполезен ровно в
+            // том случае, ради которого он существует, - когда очередь набита потомками того,
+            // кто пришёл последним.
+            this.collapseNestedMutationRoots(root);
+        }
+
         if (this.pendingMutationRoots.length >= this.maxPendingMutationRoots) {
             this.mutationQueueOverflows += 1;
             this.mutationsSkippedByLimit += 1;
@@ -1214,11 +1374,43 @@ export default class TriggerPhrases extends ModuleCore {
         }
 
         this.pendingMutationRoots.push(root);
+        this.pendingMutationRootSet.add(root);
         this.mutationQueueHighWaterMark = Math.max(
             this.mutationQueueHighWaterMark,
             this.pendingMutationRoots.length
         );
         return true;
+    }
+
+    // Снимает из очереди корни, у которых предок тоже в очереди. Раз на батч, а не на каждую
+    // постановку: результат тот же, а стоимость перестаёт быть квадратичной по длине очереди.
+    collapseNestedMutationRoots(incomingRoot = null) {
+        if (this.pendingMutationRoots.length === 0
+            || (this.pendingMutationRoots.length < 2 && !incomingRoot)) {
+            return;
+        }
+
+        const survivingRoots = this.pendingMutationRoots.filter((root) => {
+            for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
+                if (ancestor === incomingRoot || this.pendingMutationRootSet.has(ancestor)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        this.coalescedMutationRoots += this.pendingMutationRoots.length - survivingRoots.length;
+        this.pendingMutationRoots = survivingRoots;
+        this.pendingMutationRootSet = new Set(survivingRoots);
+    }
+
+    // Единственный способ забрать очередь: схлопывание раз на батч живёт здесь, поэтому его нельзя
+    // забыть на одном из двух путей потребления.
+    takePendingMutationRoots() {
+        this.collapseNestedMutationRoots();
+        const roots = this.pendingMutationRoots.splice(0);
+        this.pendingMutationRootSet.clear();
+        return roots;
     }
 
     requestMutationFullRescan() {
@@ -1278,7 +1470,7 @@ export default class TriggerPhrases extends ModuleCore {
             return;
         }
 
-        const roots = this.pendingMutationRoots.splice(0);
+        const roots = this.takePendingMutationRoots();
         const requiresFullRescan = this.mutationQueueRequiresFullRescan;
         this.mutationQueueRequiresFullRescan = false;
         if (roots.length === 0 && !requiresFullRescan) {
@@ -1428,10 +1620,17 @@ export default class TriggerPhrases extends ModuleCore {
             this.currentPerformanceTelemetry.forcedFullRescans = this.mutationFullRescans;
             this.currentPerformanceTelemetry.deferredMutationBatches = this.mutationBatchesDeferredByInitialScan;
         }
+        // Публикуется КОПИЯ. serializeActiveFindings() вызывается и вне скана - из performScan сразу
+        // после firstScan и из buildCurrentScanResponse() в js/content.js на каждой смене lifecycle и
+        // обновлении popup, - а запись шла в тот же объект, который уже опубликован как телеметрия
+        // завершённого скана: serializationMs и serializedFindings бесконечно накапливались в
+        // «телеметрии первичного скана» и переставали её описывать (TASKS 10.6). Внесканные записи
+        // теперь копятся в отдельном аккумуляторе lastCompletedPerformanceTelemetry.
+        const publishedTelemetry = { ...this.currentPerformanceTelemetry };
         if (this.currentPerformanceTelemetry.scanType === 'initial') {
-            this.lastInitialPerformanceTelemetry = this.currentPerformanceTelemetry;
+            this.lastInitialPerformanceTelemetry = publishedTelemetry;
         } else {
-            this.lastMutationPerformanceTelemetry = this.currentPerformanceTelemetry;
+            this.lastMutationPerformanceTelemetry = publishedTelemetry;
         }
         this.lastCompletedPerformanceTelemetry = this.currentPerformanceTelemetry;
         this.currentPerformanceTelemetry = null;
@@ -1460,18 +1659,26 @@ export default class TriggerPhrases extends ModuleCore {
         this.candidateContextCache = new WeakMap();
     }
 
+    // Нарезка этого модуля появилась раньше ядерной и была богаче: лимиты куска не только по
+    // времени, но и по элементам, кандидатам, символам и правилам. Поэтому она не заменена, а
+    // СВЕДЕНА с ядерной (C2): учёт активного времени и потолок куска берутся у ядра - иначе рядом
+    // жили бы два определения «сколько мы уже отработали», и общий потолок на вкладку до этого
+    // модуля не доходил бы вовсе.
     beginWorkSlice() {
-        this.currentWorkSliceStartedAt = performance.now();
+        super.beginWorkSlice();
+        this.currentWorkSliceStartedAt = this.currentSliceStartedAt;
+        // Дедлайн ОСТАТКА бюджета скана - отдельная величина от потолка куска: первый говорит
+        // «работа закончилась», второй - «пора уступить и продолжить».
         const remainingTimeBudget = Math.max(0, this.currentScanTimeBudgetMs - this.currentScanActiveProcessingMs);
         this.currentScanDeadline = this.currentWorkSliceStartedAt + remainingTimeBudget;
     }
 
     finishWorkSlice() {
         if (this.currentWorkSliceStartedAt === null) {
-            return;
+            return 0;
         }
 
-        const sliceDuration = Math.max(0, performance.now() - this.currentWorkSliceStartedAt);
+        const sliceDuration = super.finishWorkSlice();
         this.currentScanActiveProcessingMs += sliceDuration;
         const telemetry = this.currentPerformanceTelemetry || this.lastCompletedPerformanceTelemetry;
         if (telemetry) {
@@ -1480,6 +1687,7 @@ export default class TriggerPhrases extends ModuleCore {
         }
         this.currentWorkSliceStartedAt = null;
         this.currentScanDeadline = Number.POSITIVE_INFINITY;
+        return sliceDuration;
     }
 
     isScanTimeBudgetReached() {
@@ -1548,6 +1756,22 @@ export default class TriggerPhrases extends ModuleCore {
     }
 
     onDestroy() {
+        this.stopScheduledWork();
+        this.resetFindingState();
+    }
+
+    // Пауза оставляет находки и снимает всё остальное. Уходит то, что либо сработает в фоновой
+    // вкладке (таймеры, очередь корней, отложенный первичный скан), либо верно лишь пока DOM заведомо
+    // не двигался (кэши текста кандидатов, предков и приватных поддеревьев).
+    // Остаются: активные находки, их ключи и - что важнее всего - `candidateIds`. Именно этот
+    // WeakMap делает возврат без рескана безопасным: тот же элемент получит тот же id, поэтому
+    // повторный разбор после мутации ОБНОВИТ существующую находку, а не заведёт вторую.
+    // resetFindingState() зовётся только из onDestroy: там модуль действительно уходит.
+    onPause() {
+        this.stopScheduledWork();
+    }
+
+    stopScheduledWork() {
         if (this.mutationBatchTimer !== null) {
             clearTimeout(this.mutationBatchTimer);
             this.mutationBatchTimer = null;
@@ -1562,6 +1786,8 @@ export default class TriggerPhrases extends ModuleCore {
             resolveInitialYield();
         }
         this.pendingMutationRoots = [];
+        // Зеркало очереди: проверка «этот корень уже стоит» за O(1) вместо прохода по массиву (10.8).
+        this.pendingMutationRootSet = new Set();
         this.mutationQueueRequiresFullRescan = false;
         this.mutationBatchPromise = null;
         this.mutationWorkDeferredByInitialScan = false;
@@ -1581,7 +1807,6 @@ export default class TriggerPhrases extends ModuleCore {
         if (this.lastScanStatus === 'running') {
             this.lastScanStatus = this.isEnabled ? 'aborted' : 'disabled';
         }
-        this.resetFindingState();
     }
 
     recordFinding(finding) {

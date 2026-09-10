@@ -11,7 +11,11 @@ const MODULE_IDS = {
 };
 export const CONFIG_STORAGE_KEYS = {
     EXTENSION_CONFIG: 'extensionConfig',
-    TRIGGER_PHRASES_CUSTOM_PATTERNS: 'pagecheck.triggerPhrases.customPatterns.v1'
+    TRIGGER_PHRASES_CUSTOM_PATTERNS: 'pagecheck.triggerPhrases.customPatterns.v1',
+    // Признак «последняя запись конфигурации ушла только в local». Пишется той же local-операцией,
+    // что и сам конфиг, поэтому лишней записи в storage не создаёт. Читается на холодном пути
+    // getConfig и решает, какая копия авторитетна (TASKS C6.3).
+    CONFIG_LOCAL_AUTHORITATIVE: 'pagecheck.config.localAuthoritative.v1'
 };
 
 const CUSTOM_PATTERN_CATALOG_VERSION = 1;
@@ -33,11 +37,23 @@ function isPlainRecord(value) {
 // Settings used to be validated by `typeof value === typeof defaultValue` alone, which is blind to
 // arrays (`typeof [] === 'object'`, so any object passed). The findings API stores an allowlist of
 // extension IDs there, and an allowlist that accepts malformed input is a security hole, not a
-// cosmetic one - hence a per-field rule. Enum-valued settings get the same treatment when the
-// intervention modes land (TASKS C4.2/C4.3); today no setting is enum-valued.
+// cosmetic one - hence a per-field rule.
 const SETTINGS_ARRAY_ITEM_RULES = {
     // Chrome extension IDs are exactly 32 characters from a-p.
     findingsApiAllowedExtensionIds: { pattern: /^[a-p]{32}$/, maxItems: 32 }
+};
+
+// Enum-valued settings. The intervention modes landed (TASKS C4.2/C4.3), and until this rule existed
+// `activeRemediationAction` accepted ANY string: a hand-edited or corrupted profile could store
+// something that is not an action at all. The runtime survived it only because InterventionLayer
+// falls back to `annotate` for an unknown value - that is a last line of defence, not a reason to
+// hand it garbage. Validation belongs here, where the profile is read.
+// The list is duplicated on purpose: `js/intervention-layer.js` owns the runtime meaning of these
+// values, but importing it here would drag DOM-facing code into the service worker and the options
+// page. The shield below (`invalid-activeRemediationAction-fallback` in runConfigSmokeCheck) is what
+// keeps the two copies honest.
+const SETTINGS_ENUM_RULES = {
+    activeRemediationAction: ['annotate', 'reveal', 'neutralize']
 };
 
 function validateSettingsValue(field, value, defaultValue) {
@@ -60,6 +76,11 @@ function validateSettingsValue(field, value, defaultValue) {
         return [...seen];
     }
 
+    const allowedValues = SETTINGS_ENUM_RULES[field];
+    if (allowedValues) {
+        return allowedValues.includes(value) ? value : defaultValue;
+    }
+
     return typeof value === typeof defaultValue ? value : defaultValue;
 }
 
@@ -74,10 +95,22 @@ export const ConfigManager = {
     configCache: null,
     lastSaveTime: 0,
     saveDebounce: 1000,
+    // Отложенная запись в sync: последнее состояние и таймер. Пока pendingSyncConfig не null,
+    // авторитетной копией считается local - в sync лежит более старое значение.
+    pendingSyncConfig: null,
+    syncWriteTimer: null,
+    localAuthoritative: null,
 
     async getConfig() {
         if (this.configCache) {
             return this.configCache;
+        }
+
+        // Резерв обязан читаться так же, как пишется. Раньше local писался при отказе sync, но
+        // читался только если ЧТЕНИЕ sync бросило, поэтому успешное чтение устаревшего sync
+        // выигрывало у свежего local и молча откатывало изменение пользователя (TASKS C6.3).
+        if (await this.isLocalAuthoritative()) {
+            return this.getFromLocalStorage();
         }
 
         try {
@@ -88,6 +121,38 @@ export const ConfigManager = {
         } catch (error) {
             Logger.warn('Sync storage failed, trying local storage...', error);
             return this.getFromLocalStorage();
+        }
+    },
+
+    async isLocalAuthoritative() {
+        if (this.pendingSyncConfig !== null) {
+            return true;
+        }
+        if (this.localAuthoritative !== null) {
+            return this.localAuthoritative;
+        }
+        try {
+            const result = await extensionStorage.get('local', CONFIG_STORAGE_KEYS.CONFIG_LOCAL_AUTHORITATIVE);
+            this.localAuthoritative = result[CONFIG_STORAGE_KEYS.CONFIG_LOCAL_AUTHORITATIVE] === true;
+        } catch (error) {
+            Logger.warn('Failed to read the local-authoritative flag, assuming sync:', error);
+            this.localAuthoritative = false;
+        }
+        return this.localAuthoritative;
+    },
+
+    // Вызывается, когда в области sync появилось ЧУЖОЕ значение (другое устройство или другой
+    // контекст расширения): sync снова свежий, залипший признак снимается. Без этого один отказ
+    // записи в sync навсегда отрезал бы устройство от синхронизации.
+    async releaseLocalAuthoritative() {
+        if (this.localAuthoritative === false) {
+            return;
+        }
+        this.localAuthoritative = false;
+        try {
+            await extensionStorage.remove('local', CONFIG_STORAGE_KEYS.CONFIG_LOCAL_AUTHORITATIVE);
+        } catch (error) {
+            Logger.warn('Failed to clear the local-authoritative flag:', error);
         }
     },
 
@@ -104,23 +169,25 @@ export const ConfigManager = {
         }
     },
 
+    // Раньше debounce не откладывал запись, а ВЫБРАСЫВАЛ её: вызывающему возвращался обновлённый
+    // кэш, то есть сохранение выглядело успешным, а до storage не доходило ничего. Потерянное
+    // состояние жило только в памяти и откатывалось при следующей выгрузке service worker
+    // (TASKS C6.2). Теперь:
+    //   - local пишется всегда и сразу (у него нет квоты на число записей) - это делает сохранение
+    //     долговечным независимо от таймеров;
+    //   - sync (квота chrome.storage.sync - 120 записей в минуту) ограничивается по частоте, но
+    //     ограничение ОТКЛАДЫВАЕТ последнюю версию, а не теряет её;
+    //   - пока отложенная запись не ушла, в local лежит признак «авторитетен local», поэтому даже
+    //     выгрузка worker до срабатывания таймера не приводит к откату настроек.
     async saveConfig(config, immediate = false) {
         try {
             const validatedConfig = this.validateConfig(config);
             this.configCache = await this.attachCustomPatternCatalog(validatedConfig);
 
-            const now = Date.now();
-            if (!immediate && now - this.lastSaveTime < this.saveDebounce) {
-                return this.configCache;
-            }
-            this.lastSaveTime = now;
+            this.pendingSyncConfig = validatedConfig;
+            await this.saveToLocalStorage(validatedConfig, { syncPending: true });
+            await this.scheduleSyncWrite(immediate);
 
-            try {
-                await extensionStorage.set('sync', { [CONFIG_STORAGE_KEYS.EXTENSION_CONFIG]: validatedConfig });
-            } catch (error) {
-                Logger.warn('Sync storage failed, saving general config locally...', error);
-            }
-            await this.saveToLocalStorage(validatedConfig);
             Logger.debug('Config saved successfully');
             return this.configCache;
         } catch (error) {
@@ -129,8 +196,53 @@ export const ConfigManager = {
         }
     },
 
-    async saveToLocalStorage(config) {
-        await extensionStorage.set('local', { [CONFIG_STORAGE_KEYS.EXTENSION_CONFIG]: this.validateConfig(config) });
+    scheduleSyncWrite(immediate = false) {
+        const elapsed = Date.now() - this.lastSaveTime;
+        if (immediate || elapsed >= this.saveDebounce) {
+            return this.flushSyncWrite();
+        }
+        if (this.syncWriteTimer === null) {
+            this.syncWriteTimer = setTimeout(() => {
+                this.syncWriteTimer = null;
+                this.flushSyncWrite().catch((error) => {
+                    Logger.warn('Deferred sync write failed:', error);
+                });
+            }, this.saveDebounce - elapsed);
+        }
+        return Promise.resolve();
+    },
+
+    async flushSyncWrite() {
+        if (this.syncWriteTimer !== null) {
+            clearTimeout(this.syncWriteTimer);
+            this.syncWriteTimer = null;
+        }
+        const config = this.pendingSyncConfig;
+        if (config === null) {
+            return;
+        }
+        this.pendingSyncConfig = null;
+        this.lastSaveTime = Date.now();
+
+        try {
+            await extensionStorage.set('sync', { [CONFIG_STORAGE_KEYS.EXTENSION_CONFIG]: config });
+        } catch (error) {
+            // Отказ sync - не потеря настроек: копия в local уже лежит и помечена авторитетной.
+            Logger.warn('Sync storage failed, the local copy stays authoritative:', error);
+            return;
+        }
+        await this.releaseLocalAuthoritative();
+    },
+
+    async saveToLocalStorage(config, { syncPending = false } = {}) {
+        // Признак пишется той же операцией, что и конфиг: одна запись в storage, одно событие
+        // storage.onChanged, никакой отдельной стоимости.
+        const payload = { [CONFIG_STORAGE_KEYS.EXTENSION_CONFIG]: this.validateConfig(config) };
+        if (syncPending) {
+            payload[CONFIG_STORAGE_KEYS.CONFIG_LOCAL_AUTHORITATIVE] = true;
+            this.localAuthoritative = true;
+        }
+        await extensionStorage.set('local', payload);
     },
 
     async getCustomPatternCatalog() {
@@ -301,7 +413,6 @@ export const ConfigManager = {
         if (isPlainRecord(legacyVisual)) {
             normalized.modules[MODULE_IDS.VISUAL_MANIPULATION] = {
                 enabled: legacyVisual.enabled,
-                allowIntervention: legacyVisual.allowIntervention,
                 scanInterval: legacyVisual.scanInterval,
                 sensitivity: legacyVisual.sensitivity,
                 hiddenTextDisplayMode: legacyVisual.hiddenTextDisplayMode,
@@ -315,7 +426,6 @@ export const ConfigManager = {
         if (isPlainRecord(legacyLinkSecurity)) {
             normalized.modules[MODULE_IDS.LINK_DOMAIN_SECURITY] = {
                 enabled: legacyLinkSecurity.enabled,
-                allowIntervention: legacyLinkSecurity.allowIntervention,
                 actionOnDetect: this.mapLegacyActionMode(legacyLinkSecurity),
                 ...normalized.modules[MODULE_IDS.LINK_DOMAIN_SECURITY]
             };
@@ -345,7 +455,6 @@ export const ConfigManager = {
             modules: {
                 [MODULE_IDS.VISUAL_MANIPULATION]: {
                     enabled: true,
-                    allowIntervention: true,
                     detectHiddenText: true,
                     detectHiddenInputs: true,
                     detectOverlays: true,
@@ -368,7 +477,6 @@ export const ConfigManager = {
                 },
                 [MODULE_IDS.LINK_DOMAIN_SECURITY]: {
                     enabled: true,
-                    allowIntervention: true,
                     detectHomographs: true,
                     detectLinkMismatch: true,
                     detectRedirectPatterns: true,
@@ -386,7 +494,6 @@ export const ConfigManager = {
                 },
                 [MODULE_IDS.TRIGGER_PHRASES]: {
                     enabled: true,
-                    allowIntervention: true,
                     caseSensitive: false,
                     sensitivity: 'medium',
                     actionOnDetect: 'notify',
@@ -401,7 +508,6 @@ export const ConfigManager = {
                 },
                 [MODULE_IDS.PROMPT_SPLITTING]: {
                     enabled: false,
-                    allowIntervention: true,
                     sensitivity: 'medium',
                     detectionThreshold: 0.8,
                     actionOnDetect: 'log',
@@ -416,7 +522,6 @@ export const ConfigManager = {
                 },
                 [MODULE_IDS.API_INTERCEPTOR]: {
                     enabled: false,
-                    allowIntervention: true,
                     monitorOnly: true,
                     actionOnDetect: 'log',
                     name: {
@@ -441,7 +546,14 @@ export const ConfigManager = {
                 // Open findings API (TASKS C4.7). Off by default, and an empty allowlist means
                 // nobody even when it is on - both gates must be opened deliberately by the user.
                 findingsApiEnabled: false,
-                findingsApiAllowedExtensionIds: []
+                findingsApiAllowedExtensionIds: [],
+                // Активное вмешательство (TASKS C4.3). Выключено по умолчанию: оно пересекает
+                // пассивную границу MVP, и включать его пользователь должен осознанно - вместе с
+                // раскрытием антидетект-риска (C4.5).
+                activeRemediationEnabled: false,
+                // Что делать с находкой о скрытом от человека контенте, когда гейт открыт.
+                // По умолчанию самое безопасное: аддитивная и полностью обратимая метка.
+                activeRemediationAction: 'annotate'
             },
             statistics: {
                 totalScans: 0,
@@ -457,9 +569,16 @@ export const ConfigManager = {
                 extensionStorage.remove('sync', CONFIG_STORAGE_KEYS.EXTENSION_CONFIG),
                 extensionStorage.remove('local', [
                     CONFIG_STORAGE_KEYS.EXTENSION_CONFIG,
-                    CONFIG_STORAGE_KEYS.TRIGGER_PHRASES_CUSTOM_PATTERNS
+                    CONFIG_STORAGE_KEYS.TRIGGER_PHRASES_CUSTOM_PATTERNS,
+                    CONFIG_STORAGE_KEYS.CONFIG_LOCAL_AUTHORITATIVE
                 ])
             ]);
+            if (this.syncWriteTimer !== null) {
+                clearTimeout(this.syncWriteTimer);
+                this.syncWriteTimer = null;
+            }
+            this.pendingSyncConfig = null;
+            this.localAuthoritative = false;
             this.configCache = null;
             Logger.info('Config cleared successfully');
         } catch (error) {
@@ -511,6 +630,39 @@ export const ConfigManager = {
             passed: withoutModeActual === 'ancestors',
             expected: 'ancestors',
             actual: withoutModeActual
+        });
+
+        // Активное вмешательство - единственная настройка проекта с перечислимым значением, и
+        // проверять её нужно ровно там же, где остальные умолчания: профиль с мусором в этом поле
+        // не должен доехать до слоя вмешательства (TASKS C4.2).
+        const defaultAction = defaultConfig.settings?.activeRemediationAction;
+        checks.push({
+            name: 'default-activeRemediationAction-is-annotate',
+            passed: defaultAction === 'annotate',
+            expected: 'annotate',
+            actual: defaultAction
+        });
+
+        const configWithInvalidAction = this.validateConfig({
+            settings: { activeRemediationEnabled: true, activeRemediationAction: 'delete-everything' }
+        });
+        const invalidActionActual = configWithInvalidAction.settings?.activeRemediationAction;
+        checks.push({
+            name: 'invalid-activeRemediationAction-fallback',
+            passed: invalidActionActual === 'annotate',
+            expected: 'annotate',
+            actual: invalidActionActual
+        });
+
+        const configWithNeutralizeAction = this.validateConfig({
+            settings: { activeRemediationAction: 'neutralize' }
+        });
+        const neutralizeActionActual = configWithNeutralizeAction.settings?.activeRemediationAction;
+        checks.push({
+            name: 'valid-activeRemediationAction-preserved',
+            passed: neutralizeActionActual === 'neutralize',
+            expected: 'neutralize',
+            actual: neutralizeActionActual
         });
 
         const configWithInvalidMode = this.validateConfig({
@@ -661,31 +813,58 @@ export const ConfigManager = {
         };
     },
 
+    // Раньше миграция ЗАМЕЩАЛА текущую конфигурацию: convertOldConfig стартовал с дефолтов, копировал
+    // из легаси-ключа только language/theme и сохранялся поверх актуального extensionConfig. У любого
+    // пользователя, у которого в sync ещё лежал pagecheck_settings, обновление расширения молча
+    // сбрасывало настройки модулей и allowlist findings-API (TASKS C6.4).
+    // Принятый приоритет источников: актуальный ключ ВСЕГДА главнее легаси. Если extensionConfig уже
+    // есть - легаси-ключ это остатки, их надо убрать, а не применять.
     async migrateFromPreviousVersion(previousVersion) {
         try {
-            const result = await extensionStorage.get('sync', 'pagecheck_settings');
-            const oldConfig = result.pagecheck_settings;
-
-            if (oldConfig) {
-                const migratedConfig = this.convertOldConfig(oldConfig, previousVersion);
-                await this.saveConfig(migratedConfig);
-                await extensionStorage.remove('sync', 'pagecheck_settings');
-                Logger.info(`Migrated config from version ${previousVersion}`);
+            const [legacyResult, syncResult, localResult] = await Promise.all([
+                extensionStorage.get('sync', 'pagecheck_settings'),
+                extensionStorage.get('sync', CONFIG_STORAGE_KEYS.EXTENSION_CONFIG).catch(() => ({})),
+                extensionStorage.get('local', CONFIG_STORAGE_KEYS.EXTENSION_CONFIG).catch(() => ({}))
+            ]);
+            const oldConfig = legacyResult.pagecheck_settings;
+            if (!isPlainRecord(oldConfig)) {
+                return;
             }
+
+            const currentConfig = isPlainRecord(localResult[CONFIG_STORAGE_KEYS.EXTENSION_CONFIG])
+                ? localResult[CONFIG_STORAGE_KEYS.EXTENSION_CONFIG]
+                : isPlainRecord(syncResult[CONFIG_STORAGE_KEYS.EXTENSION_CONFIG])
+                    ? syncResult[CONFIG_STORAGE_KEYS.EXTENSION_CONFIG]
+                    : null;
+
+            if (currentConfig !== null) {
+                await extensionStorage.remove('sync', 'pagecheck_settings');
+                Logger.info('Legacy config key removed: the current configuration is authoritative');
+                return;
+            }
+
+            const migratedConfig = this.convertOldConfig(oldConfig, previousVersion, this.getDefaultConfig());
+            await this.saveConfig(migratedConfig, true);
+            await extensionStorage.remove('sync', 'pagecheck_settings');
+            Logger.info(`Migrated config from version ${previousVersion}`);
         } catch (error) {
             Logger.warn('Migration failed:', error);
         }
     },
 
-    convertOldConfig(oldConfig, version) {
-        const newConfig = this.getDefaultConfig();
+    // baseConfig - то, поверх чего кладутся легаси-значения. Именно слияние, а не замена: значения
+    // из легаси-ключа переносятся только там, где они есть.
+    convertOldConfig(oldConfig, version, baseConfig = this.getDefaultConfig()) {
+        const newConfig = this.validateConfig(baseConfig);
 
-        if (version.startsWith('0.')) {
+        // previousVersion приходит из chrome.runtime.onInstalled и в принципе может отсутствовать -
+        // раньше version.startsWith() на этом бросал и миграция уходила в catch как «failed».
+        if (typeof version !== 'string' || version.startsWith('0.')) {
             if (oldConfig.language) newConfig.language = oldConfig.language;
             if (oldConfig.theme) newConfig.theme = oldConfig.theme;
         }
 
-        return newConfig;
+        return this.validateConfig(newConfig);
     }
 };
 

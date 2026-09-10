@@ -171,6 +171,8 @@ class PopupManager {
             await this.toggleAllModules(false);
         } else if (action === 'viewReport') {
             this.openSettings();
+        } else if (action === 'revertIntervention') {
+            await this.revertIntervention();
         }
     }
 
@@ -217,7 +219,34 @@ class PopupManager {
             });
 
             if (response?.success) {
-                this.showNotification(I18n.getMessage('scanCompleted'), 'success');
+                // C2, transparency: показываем СВОЮ цену на этой странице. Доверие после инцидента с
+                // 54 вкладками восстанавливается числом, которое пользователь видит сам.
+                const activeMs = response?.pageStatus?.context?.lastScanActiveMs;
+                const costMessage = Number.isFinite(activeMs) && activeMs > 0
+                    ? I18n.getMessage('scanCompletedWithCost', [String(activeMs)])
+                    : '';
+                this.showNotification(costMessage || I18n.getMessage('scanCompleted'), 'success');
+                // C4.4: страница, снявшая наши метки, - это факт о странице, и он должен доходить
+                // до человека, а не оставаться в консоли. Восстанавливать метку мы не будем: война
+                // правок в main-thread пользователя защитой не является.
+                this.updateInterventionControls(response?.pageStatus?.intervention);
+                const applied = response?.pageStatus?.intervention?.appliedEdits;
+                if (Number.isFinite(applied) && applied > 0) {
+                    this.showNotification(I18n.getMessage('interventionApplied', [String(applied)]), 'success');
+                }
+                const tampered = response?.pageStatus?.intervention?.tamperedEdits;
+                if (Number.isFinite(tampered) && tampered > 0) {
+                    this.showNotification(I18n.getMessage('interventionTamperedNotice'), 'error');
+                }
+                // C4: усиленное предупреждение ровно в том случае, где цена ошибки выше обычной -
+                // страницу с находками читает автоматизированный браузер, а не только человек.
+                // Предупреждение и ничего больше: детекторы от этого сигнала не меняются, потому что
+                // подделать его тривиально в обе стороны.
+                const context = response?.pageStatus?.context;
+                const findingsCount = response?.pageStatus?.totalFindings;
+                if (context?.automation === true && Number.isFinite(findingsCount) && findingsCount > 0) {
+                    this.showNotification(I18n.getMessage('automationFindingsNotice'), 'error');
+                }
             } else {
                 throw new Error(response?.error || 'Scan failed');
             }
@@ -231,6 +260,39 @@ class PopupManager {
             this.showNotification(I18n.getMessage('scanFailed'), 'error');
         } finally {
             this.setLoadingState(false);
+        }
+    }
+
+    // Кнопка существует только тогда, когда есть что откатывать: активное вмешательство выключено
+    // по умолчанию, и предлагать «вернуть страницу» там, где мы её не трогали, значит обещать
+    // действие, которого не было.
+    updateInterventionControls(intervention) {
+        const button = document.getElementById('revert-intervention-btn');
+        if (!button) {
+            return;
+        }
+        const applied = Number.isFinite(intervention?.appliedEdits) ? intervention.appliedEdits : 0;
+        button.hidden = applied <= 0;
+        this.lastAppliedInterventionEdits = applied;
+    }
+
+    async revertIntervention() {
+        try {
+            const tab = await this.getCurrentTab();
+            if (!this.isScannableTab(tab)) {
+                this.showNotification(I18n.getMessage('pageNotScannable'), 'error');
+                return;
+            }
+
+            const response = await chrome.tabs.sendMessage(tab.id, { action: 'revertIntervention' });
+            if (response?.success !== true) {
+                throw new Error('Revert failed');
+            }
+            this.showNotification(I18n.getMessage('interventionReverted'), 'success');
+            this.updateInterventionControls({ appliedEdits: 0 });
+        } catch (error) {
+            Logger.error('Revert error:', error);
+            this.showNotification(I18n.getMessage('interventionRevertFailed'), 'error');
         }
     }
 

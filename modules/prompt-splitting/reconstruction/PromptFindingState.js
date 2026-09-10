@@ -3,6 +3,11 @@ const DEFAULT_LIMITS = Object.freeze({
     maxActiveFindings: 200,
     maxReverseIndexEntries: 1000,
     maxPendingFindings: 200,
+    // ВНИМАНИЕ: связано с mutationReconstructionLimits.maxRegions в PromptSplitting.js, которое тоже
+    // равно 8. Ограничение regionIds в beginBatch() выглядит как источник залипших findings, но
+    // сегодня недостижимо ровно потому, что более 8 регионов всегда форсируют markPartial() и
+    // неавторитетный коммит. Если ЛЮБАЯ из двух констант изменится независимо, дефект станет
+    // достижимым (разбор - раздел «Проверено и снято» в TASKS.ru.md модуля).
     maxCandidateIdsPerFinding: 8,
     maxSupportingRules: 8,
     maxCodes: 12,
@@ -110,8 +115,11 @@ export default class PromptFindingState {
         };
     }
 
+    // Возвращает true, если находка ПРИНЯТА (заведена новой или слита с существующей), и false
+    // на каждом отказе по лимиту. Ответ нужен вызывающему: узел для слоя вмешательства отдаётся
+    // только по принятой находке (C4.3), а отказ по лимиту - это `partial`, а не находка.
     recordDecision(batch, decision, evidence) {
-        if (!batch || decision?.eligibility !== 'eligible' || !evidence?.regionId) return;
+        if (!batch || decision?.eligibility !== 'eligible' || !evidence?.regionId) return false;
         const candidateIds = uniqueBounded(evidence.candidateIds || [], this.limits.maxCandidateIdsPerFinding + 1);
         const contributingCandidateIds = uniqueBounded(evidence.contributingCandidateIds || [], this.limits.maxCandidateIdsPerFinding + 1);
         if (candidateIds.length === 0 || contributingCandidateIds.length < 2
@@ -119,7 +127,7 @@ export default class PromptFindingState {
             || contributingCandidateIds.length > this.limits.maxCandidateIdsPerFinding) {
             batch.partial = true;
             batch.overflow = true;
-            return;
+            return false;
         }
         const now = Date.now();
         const incoming = {
@@ -163,10 +171,10 @@ export default class PromptFindingState {
             if (batch.pending.length >= this.limits.maxPendingFindings) {
                 batch.partial = true;
                 batch.overflow = true;
-                return;
+                return false;
             }
             batch.pending.push(incoming);
-            return;
+            return true;
         }
         const mergedCandidateIds = uniqueBounded([...existing.candidateIds, ...incoming.candidateIds], this.limits.maxCandidateIdsPerFinding + 1);
         const mergedContributingIds = uniqueBounded(
@@ -177,7 +185,7 @@ export default class PromptFindingState {
             || mergedContributingIds.length > this.limits.maxCandidateIdsPerFinding) {
             batch.partial = true;
             batch.overflow = true;
-            return;
+            return false;
         }
         const preferred = choosePreferredFinding(existing, incoming);
         existing.candidateIds = mergedCandidateIds;
@@ -192,11 +200,16 @@ export default class PromptFindingState {
             mitigationCodes: uniqueBounded([...existing.finding.mitigationCodes, ...incoming.finding.mitigationCodes], this.limits.maxCodes),
             contributingCandidateCount: mergedContributingIds.length,
             contributingFragmentCount: Math.max(existing.finding.contributingFragmentCount, incoming.finding.contributingFragmentCount),
-            partial: existing.finding.partial && incoming.finding.partial,
+            // || как во всём остальном модуле: слияние частичной находки с полной раньше СНИМАЛО
+            // флаг, и находка, чья уверенность была срезана через partial-evidence-cap, уходила в UI
+            // как полное свидетельство - пользователю показывался более уверенный вывод, чем есть
+            // на самом деле (TASKS 11.8).
+            partial: existing.finding.partial || incoming.finding.partial,
             truncated: existing.finding.truncated && incoming.finding.truncated,
             firstDetectedAt: existing.finding.firstDetectedAt,
             lastDetectedAt: now
         };
+        return true;
     }
 
     commitBatch(batch, options = {}) {
@@ -238,8 +251,17 @@ export default class PromptFindingState {
         }
         if (next.size > this.limits.maxActiveFindings) {
             this.overflowCount += next.size - this.limits.maxActiveFindings;
+            // preserved строится из next, а не из this.activeFindings: раньше основой служило
+            // состояние ДО коммита, поэтому находка, которую блок region-scope только что удалил,
+            // возвращалась. И поскольку старые findings заполняли preserved первыми, при
+            // activeFindings на уровне maxActiveFindings ни один новый pending-finding больше не
+            // проходил - состояние запиралось до перезагрузки страницы (TASKS 11.6).
+            // Политика вытеснения при переполнении: сохраняем то, что уже прошло коммит, в порядке
+            // их появления, затем добираем pending. Менее уверенное не жертвуется отдельно -
+            // уверенность здесь не сравнивается ни с чем и такая политика требовала бы собственного
+            // замера на корпусе.
             const preserved = new Map();
-            for (const [key, holder] of this.activeFindings) {
+            for (const [key, holder] of next) {
                 if (preserved.size >= this.limits.maxActiveFindings) break;
                 preserved.set(key, copyHolder(holder));
             }

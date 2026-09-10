@@ -1,11 +1,20 @@
+// @data-list Теги-контейнеры текста из HTML. Устаревают со спецификацией, то есть очень
+// медленно. Устаревание = ТИШИНА: текст в новом теге не получит кандидата вовсе. Сверяться
+// с разделом HTML про text-level и grouping content.
 const PRIMARY_CONTAINERS = new Set([
     'p', 'li', 'blockquote', 'figcaption', 'caption', 'td', 'th', 'dt', 'dd',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
 ]);
 const INTERACTIVE_CONTAINERS = new Set(['a', 'button', 'summary', 'label']);
+// @data-list Контейнеры второго выбора, когда основного среди предков нет.
+// Устаревание = ТИШИНА, тот же класс, что у PRIMARY_CONTAINERS.
 const FALLBACK_CONTAINERS = new Set(['div', 'section', 'article', 'aside', 'main', 'header', 'footer']);
+// @data-list Технические теги, чей текст не является контентом страницы. Устаревание = ШУМ:
+// содержимое незнакомого технического тега попадёт в анализ как обычный текст.
 const TECHNICAL_TAGS = new Set(['script', 'style', 'noscript', 'template', 'head', 'meta', 'link', 'base', 'title']);
 const PRIVACY_TAGS = new Set(['input', 'textarea', 'select', 'option', 'optgroup']);
+// @data-list Теги крупных областей страницы: по ним режутся регионы реконструкции.
+// Устаревание = ТИШИНА: фрагменты из нового тега склеятся с соседями и потеряют границу.
 const MAJOR_REGION_TAGS = new Set(['article', 'aside', 'main', 'section', 'header', 'footer', 'nav', 'li', 'blockquote', 'td', 'th']);
 const ALLOWED_ATTRIBUTE_SOURCES = [
     ['title', 'title'],
@@ -46,6 +55,10 @@ function emptyDiagnostics() {
         charactersRead: 0,
         regionsCreated: 0,
         elementsSkippedByLimit: 0,
+        // Отбраковка кандидата по лимиту кандидатов считалась как пропуск ЭЛЕМЕНТА, из-за чего одно
+        // и то же событие попадало в два счётчика модуля, а «пропущено кандидатов» не отражало
+        // ничего (TASKS 11.9; C5.3: одна единица работы - ровно один счётчик ровно один раз).
+        candidatesSkippedByLimit: 0,
         childNodesSkippedByLimit: 0,
         attributesSkippedByLimit: 0,
         charactersSkippedByLimit: 0,
@@ -69,6 +82,12 @@ export default class PromptCandidateCollector {
         const getRegionId = typeof options.getRegionId === 'function'
             ? options.getRegionId
             : () => `region-${nextRegionId++}`;
+        // Loop-safety (C4): узлы, вставленные расширением, исключаются вместе с их поддеревом -
+        // тем же механизмом, что технические теги, потому что вопрос один и тот же: «это контент
+        // страницы или нет».
+        const isExtensionOwned = typeof options.isExtensionOwned === 'function'
+            ? options.isExtensionOwned
+            : () => false;
         const yieldControl = typeof options.yieldControl === 'function'
             ? options.yieldControl
             : () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -130,7 +149,7 @@ export default class PromptCandidateCollector {
                     || current.getAttribute?.('contenteditable')?.toLowerCase() !== 'false' && current.hasAttribute?.('contenteditable')
                     || current.getAttribute?.('role')?.toLowerCase() === 'textbox'
                     || current.getAttribute?.('aria-multiline')?.toLowerCase() === 'true';
-                const technical = TECHNICAL_TAGS.has(tagName);
+                const technical = TECHNICAL_TAGS.has(tagName) || isExtensionOwned(current);
                 if (privacy || technical) {
                     state = { privacy, technical };
                     break;
@@ -144,7 +163,9 @@ export default class PromptCandidateCollector {
                         || pathElement.getAttribute?.('contenteditable')?.toLowerCase() !== 'false' && pathElement.hasAttribute?.('contenteditable')
                         || pathElement.getAttribute?.('role')?.toLowerCase() === 'textbox'
                         || pathElement.getAttribute?.('aria-multiline')?.toLowerCase() === 'true',
-                    technical: state.technical || TECHNICAL_TAGS.has(pathElement.localName)
+                    technical: state.technical
+                        || TECHNICAL_TAGS.has(pathElement.localName)
+                        || isExtensionOwned(pathElement)
                 };
                 exclusionCache.set(pathElement, state);
             }
@@ -249,7 +270,7 @@ export default class PromptCandidateCollector {
 
         const createCandidate = (frame) => {
             if (candidates.length >= limits.maxCandidates) {
-                diagnostics.elementsSkippedByLimit += 1;
+                diagnostics.candidatesSkippedByLimit += 1;
                 markPartial();
                 return null;
             }
@@ -469,6 +490,15 @@ export default class PromptCandidateCollector {
 
     buildRegions(candidates, regions, limits, diagnostics, createRegionId) {
         let activeRegion = null;
+        // buildRegions начинает новый регион при превышении лимитов на регион, но id раньше брался
+        // от ЯКОРЯ, а не от куска: <article> длиннее maxCandidatesPerRegion (32) /
+        // maxFragmentsPerRegion (64) / maxCharactersPerRegion (8192) давал два и более объекта
+        // региона с одним id, и PromptReconstructionEngine считал каждый кусок после первого уже
+        // обработанным. Кандидаты с 33-го в длинной статье не реконструировались никогда - а длинный
+        // текст это ровно та поверхность, где распределённый промпт и прячут (TASKS 11.2).
+        // Первый кусок сохраняет прежний id, поэтому ключи findings обычных (односоставных) регионов
+        // не меняются.
+        const chunkCountByAnchorId = new Map();
         for (const candidate of candidates) {
             const candidateCharacters = candidate.fragments.reduce((sum, fragment) => sum + fragment.rawText.length, 0);
             const canAppend = activeRegion
@@ -481,8 +511,11 @@ export default class PromptCandidateCollector {
                     diagnostics.partial = true;
                     break;
                 }
+                const anchorRegionId = createRegionId(candidate.regionAnchor);
+                const chunkIndex = chunkCountByAnchorId.get(anchorRegionId) || 0;
+                chunkCountByAnchorId.set(anchorRegionId, chunkIndex + 1);
                 activeRegion = {
-                    id: createRegionId(candidate.regionAnchor),
+                    id: chunkIndex === 0 ? anchorRegionId : `${anchorRegionId}#${chunkIndex}`,
                     regionKey: candidate.regionKey,
                     structuralContext: { ...candidate.structuralContext },
                     candidateIds: [],

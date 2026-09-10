@@ -14,13 +14,13 @@ Detects hidden text, hidden inputs, deceptive overlays, CSS-based visual manipul
 
 ### DOM access rule
 Detectors read the DOM only through the `module` facade on their scan context, which serves computed
-styles, rects, hit-test stacks, element paths, viewport size, root font size and the color parser from
-a scan-local cache. A detector may import from `utils/domUtils.js` directly, but only functions that do
-not read layout (for example `getElementMarker`, `getNormalizedText`, `isPasswordInput`, `resolveZIndex`,
-`findHidingSource` and the pure parsers). Anything that would call `getBoundingClientRect`,
-`window.innerWidth`, `documentElement.clientWidth` or `getComputedStyle` must go through the facade,
-otherwise it escapes the cache and can force layout for every candidate. The full wrapper list lives in
-the facade comment in `VisualManipulationDetector.js`.
+styles, rects, hit-test stacks, element paths, viewport size, root font size, candidate-text answers
+and the color parser from a scan-local cache. A detector may import from `utils/domUtils.js` directly,
+but only functions that do not read layout (for example `getElementMarker`, `getNormalizedText`,
+`isPasswordInput`, `resolveZIndex`, `findHidingSource` and the pure parsers). Anything that would call
+`getBoundingClientRect`, `window.innerWidth`, `documentElement.clientWidth` or `getComputedStyle` must
+go through the facade, otherwise it escapes the cache and can force layout for every candidate. The
+full wrapper list lives in the facade comment in `VisualManipulationDetector.js`.
 
 ## Scope Boundary
 - This module owns DOM and visual presentation checks such as tiny images, hidden images, off-screen images, and suspicious inline SVG/image carriers.
@@ -30,11 +30,11 @@ the facade comment in `VisualManipulationDetector.js`.
 ## Current Status
 - MVP heuristic implementation.
 - The module is wired into the runtime and produces passive findings.
-- It does not yet perform real blocking or DOM intervention.
+- It never blocks. With the intervention gate open it publishes the node of a hidden-content finding, and the layer - not the module - annotates, reveals or neutralizes it.
+- Pause keeps findings and their dedupe keys, so returning to an unchanged tab needs no rescan (`keepsStateWhilePaused`).
 
 ## Config Keys
 - `enabled`
-- `allowIntervention`
 - `detectHiddenText`
 - `hiddenTextDisplayMode` (`ancestors` default, optional `self`)
 - `detectHiddenInputs`
@@ -98,11 +98,29 @@ the facade comment in `VisualManipulationDetector.js`.
 | `detectDeceptiveCapture` | Enables only deceptive-capture surface checks. |
 | `maxElements` | Limits detailed candidates per initial scan and per mutation batch; invalid values fall back to `250`. |
 | `scanInterval` | Sets the minimum interval between queued mutation batches; invalid values fall back to `1000` ms. Explicit `performScan()` is immediate. |
-| `allowIntervention`, `actionOnDetect`, `trackRemovedBlocks`, `sensitivity` | Deferred configuration; they do not trigger intervention, notification, removed-content storage, or scoring changes. |
+| `actionOnDetect`, `trackRemovedBlocks`, `sensitivity` | Deferred configuration; they do not trigger intervention, notification, removed-content storage, or scoring changes. |
 
 Runtime statistics expose only numeric candidate-budget diagnostics and a bounded finding history. Structural element paths are used only for module-local deduplication; they contain no text, form value, URL, or password data.
 
 Initial traversal is iterative and bounded by element and elapsed-time limits. Mutation processing retains at most 200 records per queued batch, traverses at most 1000 elements from changed subtrees, and applies a separate analysis-time budget. Budget overflow marks the result as partial and increments diagnostic counters instead of creating an unbounded catch-up loop.
+
+## Severity Model
+
+The module emits exactly three severity levels — `low`, `medium`, `high` — defined in `utils/severityModel.js` and enforced for every finding by `utils/findingFactory.js`. The findings API also accepts `critical`; this module never produces it. The same three levels are used by `semantic-analysis`, so a level means the same thing wherever it is shown.
+
+Two operations move a verdict along that scale, and both are decided per element rather than per branch:
+
+- **A co-occurring hiding mechanism raises the floor.** Adding a second way to hide the same text must never make the verdict milder. Strategy order decides which reason is *reported*, not how serious it is.
+- **Benign evidence the page author controls decides the outcome, once.** A declared transition or animation, a revealable-component marker, a revealable container role, an unreliable measurement — none of them prove the content is readable. They silence a finding only when the element has no room for a payload (short text); otherwise they lower it by one step. Suppression is never decided inside a strategy: a strategy that declines merely hands the element to the next one, which reports it through a less precise reason and occasionally at a higher severity.
+
+Per-detector rules:
+
+| Detector | `low` | `medium` | `high` |
+| --- | --- | --- | --- |
+| `hiddenTextDetector` | Off-screen positioning; opacity-only suppression; a context-dependent mechanism (anomalously small font, negative text-indent, contrast camouflage) without corroborating signals; any verdict lowered by benign evidence or by an unreliable measurement. | An unconditional hiding mechanism: `display: none`, `visibility: hidden`, `font-size` at or below 1px, fully transparent glyphs; a context-dependent mechanism corroborated by enough context signals or by text volume. | Not produced. Hiding text alone is not the module's most serious evidence — a hidden interactive surface is. |
+| `hiddenInputDetector` | Hidden decorative or infrastructure fields, a hidden upload control with a visible trigger, `aria-hidden` service markup. | The default for a hidden input surface that carries no additional signal. | Hidden file upload without a visible trigger, hidden editable surfaces that are focusable and prompt-like, hidden payment or consent controls. |
+| `overlayDetector` | Overlay-shaped elements in a benign context (named dialog or banner machinery, no suppression or capture signals, no critical target). | The default for an overlay, click-capture layer, or multi-layer stack. | Capture over a critical target (payment, consent, upload, credentials) combined with suppression, transparency, or a high z-index chain. |
+| `styleObfuscationDetector` | No risk context (decorative content), or a benign context signal without a strong escalation. | Risk context (text, input, editable, clickable, overlay) with an ordinary suppression signal. | Strong suppression and strong escalation together in a risk context — for example a clipped, filtered, or masked interactive surface next to a consent or upload control. |
 
 ## Page Indicator Integration
 - Findings from this module are expected to contribute to the shared page-level extension indicator.
@@ -118,4 +136,4 @@ Initial traversal is iterative and bounded by element and elapsed-time limits. M
 - Do not move resource-level MIME or payload-signature sniffing into this module.
 
 ## Notes
-`allowIntervention` is still a future-facing testing gate. In the current MVP state the module remains passive.
+The module stays passive: it publishes `emitFindingNode(finding, node)` for its hidden-content findings and never writes to the page itself. Active intervention is gated by `settings.activeRemediationEnabled` (off by default) and applied by `js/intervention-layer.js`.

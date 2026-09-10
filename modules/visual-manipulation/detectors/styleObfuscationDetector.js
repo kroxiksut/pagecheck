@@ -1,28 +1,43 @@
 import { createFinding, getMessage } from '../utils/findingFactory.js';
-import { getElementMarker, getNormalizedText, isPasswordInput, parseSuppressedScale } from '../utils/domUtils.js';
+import { getElementMarker, getNormalizedText, hasNonWhitespaceText, isPasswordInput, parseSuppressedScale } from '../utils/domUtils.js';
 
 export function scanStyleObfuscation({ element, style, module, supportingFindings = [], getNormalizedText: getContextText, getPseudoStyle }) {
     const baseFindings = [];
-    const semanticMismatchFinding = scanSemanticVisibilityMismatch({ element, style, module });
+    // One content-context probe per element instead of one per branch (TASKS 8.4). It walks the
+    // subtree with up to three querySelector passes, so it is built lazily - only after a branch
+    // has an actual style match - and handed out as a COPY: scanFilterBlendManipulation pushes
+    // 'overlay' into its context, and that must not leak into the transform and clipping branches.
+    let clippingContextBase;
+    const getClippingContext = () => {
+        if (clippingContextBase === undefined) {
+            clippingContextBase = resolveClippingContext(element, module);
+        }
+        return {
+            types: [...clippingContextBase.types],
+            hasRelevantContent: clippingContextBase.hasRelevantContent
+        };
+    };
+
+    const semanticMismatchFinding = scanSemanticVisibilityMismatch({ element, style, module, getClippingContext });
     if (semanticMismatchFinding) {
         baseFindings.push(semanticMismatchFinding);
     } else {
-        const filterBlendFinding = scanFilterBlendManipulation({ element, style, module });
+        const filterBlendFinding = scanFilterBlendManipulation({ element, style, module, getClippingContext });
         if (filterBlendFinding) {
             baseFindings.push(filterBlendFinding);
         } else {
-            const transformFinding = scanTransformSuppression({ element, style, module });
+            const transformFinding = scanTransformSuppression({ element, style, module, getClippingContext });
             if (transformFinding) {
                 baseFindings.push(transformFinding);
             } else {
-                const clippingFinding = scanClippingHiding({ element, style, module });
+                const clippingFinding = scanClippingHiding({ element, style, module, getClippingContext });
                 if (clippingFinding) {
                     baseFindings.push(clippingFinding);
                 } else if (
                     !hasUnexplainedTransformSuppressionOnly(style, element, module)
                     && !hasUnexplainedClippingOnly(style, element, module)
                     && !hasUnexplainedFilterBlendOnly(style, element, module)
-                    && !hasUnexplainedSemanticMismatchOnly(element)
+                    && !hasUnexplainedSemanticMismatchOnly(style, element)
                     && module.hasStyleObfuscationSignals(style, element)
                 ) {
                     baseFindings.push(
@@ -52,7 +67,7 @@ export function scanStyleObfuscation({ element, style, module, supportingFinding
     return [...baseFindings, ...presentationFindings];
 }
 
-function scanSemanticVisibilityMismatch({ element, style, module }) {
+function scanSemanticVisibilityMismatch({ element, style, module, getClippingContext }) {
     if (!(element instanceof Element) || !element.isConnected) {
         return null;
     }
@@ -70,7 +85,7 @@ function scanSemanticVisibilityMismatch({ element, style, module }) {
         return null;
     }
 
-    const context = resolveSemanticContext(element, module);
+    const context = resolveSemanticContext(element, module, getClippingContext);
     if (!context.hasRelevantContent) {
         return null;
     }
@@ -180,8 +195,8 @@ function resolveSemanticMismatchMatch(element) {
     return null;
 }
 
-function resolveSemanticContext(element, module) {
-    const baseContext = resolveClippingContext(element, module);
+function resolveSemanticContext(element, module, getClippingContext) {
+    const baseContext = getClippingContext();
     const tagName = element.tagName?.toLowerCase() || '';
     const tabindexRaw = element.getAttribute('tabindex');
     const tabindex = tabindexRaw === null ? Number.NaN : Number.parseInt(tabindexRaw, 10);
@@ -248,7 +263,7 @@ function resolveSemanticEscalationSignals(element, style, context, semanticMatch
     return [...new Set(signals)];
 }
 
-function scanFilterBlendManipulation({ element, style, module }) {
+function scanFilterBlendManipulation({ element, style, module, getClippingContext }) {
     if (!(element instanceof Element) || !element.isConnected) {
         return null;
     }
@@ -257,11 +272,12 @@ function scanFilterBlendManipulation({ element, style, module }) {
         return null;
     }
 
-    const context = resolveClippingContext(element, module);
     const filterBlendMatch = resolveFilterBlendMatch(element, style, module);
     if (!filterBlendMatch) {
         return null;
     }
+
+    const context = getClippingContext();
 
     const sourceStyle = module.getComputedStyle(filterBlendMatch.source);
     const overlayContext = isOverlayStyleContext(sourceStyle, filterBlendMatch.source);
@@ -474,7 +490,7 @@ function resolveFilterBlendEscalationSignals(element, style, context, filterBlen
     return [...new Set(signals)];
 }
 
-function scanTransformSuppression({ element, style, module }) {
+function scanTransformSuppression({ element, style, module, getClippingContext }) {
     if (!(element instanceof Element) || !element.isConnected) {
         return null;
     }
@@ -483,13 +499,13 @@ function scanTransformSuppression({ element, style, module }) {
         return null;
     }
 
-    const context = resolveClippingContext(element, module);
-    if (!context.hasRelevantContent) {
+    const transformMatch = resolveTransformSuppressionMatch(element, style, module);
+    if (!transformMatch) {
         return null;
     }
 
-    const transformMatch = resolveTransformSuppressionMatch(element, style, module);
-    if (!transformMatch) {
+    const context = getClippingContext();
+    if (!context.hasRelevantContent) {
         return null;
     }
 
@@ -593,7 +609,7 @@ function resolveTransformBenignContext(element, context, transformMatch, module)
     return [...new Set(signals)];
 }
 
-function scanClippingHiding({ element, style, module }) {
+function scanClippingHiding({ element, style, module, getClippingContext }) {
     if (!(element instanceof Element) || !element.isConnected) {
         return null;
     }
@@ -602,13 +618,13 @@ function scanClippingHiding({ element, style, module }) {
         return null;
     }
 
-    const context = resolveClippingContext(element, module);
-    if (!context.hasRelevantContent) {
+    const clippingMatch = resolveClippingMatch(element, style, module);
+    if (!clippingMatch) {
         return null;
     }
 
-    const clippingMatch = resolveClippingMatch(element, style, module);
-    if (!clippingMatch) {
+    const context = getClippingContext();
+    if (!context.hasRelevantContent) {
         return null;
     }
 
@@ -741,7 +757,6 @@ function resolveClipPathReason(value) {
 function resolveClippingContext(element, module) {
     const tagName = element.tagName?.toLowerCase() || '';
     const types = [];
-    const text = getNormalizedText(element);
     const inputSelector = 'input:not([type="password"]), textarea, select';
     const hasInput = ['input', 'textarea', 'select'].includes(tagName)
         || Boolean(element.querySelector(inputSelector));
@@ -749,7 +764,10 @@ function resolveClippingContext(element, module) {
     const clickableSelector = 'a[href], button, label, iframe, [role="button"], [role="link"], [tabindex]';
     const hasClickable = element.matches?.(clickableSelector) || Boolean(element.querySelector(clickableSelector));
 
-    if (text.length > 1 || module.hasCandidateText(element)) types.push('text');
+    // `normalized.length > 1` and `module.hasCandidateText(element)` were the same test plus a tag
+    // filter, so the OR always collapsed to the first operand; the cheap probe is exactly that
+    // predicate and no longer reads the subtree text (TASKS 8.1).
+    if (hasNonWhitespaceText(element, 2)) types.push('text');
     if (hasInput) types.push('input');
     if (hasEditable) types.push('editable');
     if (hasClickable) types.push('clickable');
@@ -811,9 +829,13 @@ function hasUnexplainedClippingOnly(style, element, module) {
         return false;
     }
 
+    // `transform` is deliberately absent here. The string test that used to stand in this spot was
+    // dead - computed transforms serialise as matrix(...) - and reviving it through
+    // parseSuppressedScale would not be a fix but a behaviour change in the wrong direction: it
+    // would let the generic fallback report elements that scanTransformSuppression had already
+    // declined, which is exactly the "fallback ignores refusals" defect from TASKS 7.2 (8.9).
     const hasOtherSignal = style.mixBlendMode !== 'normal'
         || (style.filter && style.filter !== 'none')
-        || style.transform.includes('scale(0')
         || (element.hasAttribute('aria-hidden') && module.hasCandidateText(element));
     return !hasOtherSignal;
 }
@@ -849,12 +871,25 @@ function hasUnexplainedFilterBlendOnly(style, element, module) {
     return !hasOtherSignal;
 }
 
-function hasUnexplainedSemanticMismatchOnly(element) {
-    const role = (element.getAttribute('role') || '').toLowerCase();
-    return element.getAttribute('aria-hidden') === 'true'
-        || Boolean(element.closest('[aria-hidden="true"]'))
-        || role === 'presentation'
-        || role === 'none';
+// Same shape as its three neighbours: the gate silences the generic fallback only when the
+// semantic signal is the ONLY thing wrong with the element (TASKS 8.8). It used to answer true on
+// any semantic signal, so an element carrying real suppression as well - clip-path plus filter,
+// say - fell out of the specialised branch and was then silenced here too, and no finding was
+// emitted at all.
+// The ancestor bound comes from resolveSemanticMismatchMatch itself rather than an unbounded
+// closest(): a gate that sees further than the detector can silence what the detector never had a
+// chance to claim.
+function hasUnexplainedSemanticMismatchOnly(style, element) {
+    if (!resolveSemanticMismatchMatch(element)) {
+        return false;
+    }
+
+    const hasOtherSignal = style.mixBlendMode !== 'normal'
+        || (style.filter && style.filter !== 'none')
+        || style.clip !== 'auto'
+        || style.clipPath !== 'none'
+        || Boolean(parseSuppressedScale((style.transform || 'none').trim().toLowerCase()));
+    return !hasOtherSignal;
 }
 
 function scanCssTextPresentation(context) {

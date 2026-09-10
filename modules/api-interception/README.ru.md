@@ -54,7 +54,6 @@ Observer экспортирует только bounded revision, status, aggrega
 
 - `enabled`
 - `monitorOnly` — для активации observer должен быть `true`.
-- `allowIntervention` — игнорируется в Priority 2; этот этап никогда не меняет трафик.
 
 ## Проверка
 

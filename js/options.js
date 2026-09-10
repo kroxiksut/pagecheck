@@ -16,6 +16,10 @@ const API_PERMISSION_REQUEST = Object.freeze({
     origins: ['http://*/*', 'https://*/*']
 });
 
+// Значения селектора действия. Список валидируется и здесь, и в ConfigManager: UI - удобство,
+// а не гейт.
+const REMEDIATION_ACTION_VALUES = ['annotate', 'reveal', 'neutralize'];
+
 class OptionsManager {
     constructor() {
         this.config = null;
@@ -244,8 +248,7 @@ class OptionsManager {
                 ] },
                 { title: 'detectionSettings', fields: [sensitivity, hiddenTextDisplayMode, action] },
                 { title: 'advancedSettings', fields: [
-                    { type: 'checkbox', key: 'trackRemovedBlocks', label: 'trackRemovedBlocks' },
-                    { type: 'checkbox', key: 'allowIntervention', label: 'allowIntervention' }
+                    { type: 'checkbox', key: 'trackRemovedBlocks', label: 'trackRemovedBlocks' }
                 ] }
             ];
         }
@@ -258,18 +261,14 @@ class OptionsManager {
                     { type: 'checkbox', key: 'detectRedirectPatterns', label: 'detectRedirectPatterns' },
                     { type: 'checkbox', key: 'detectUnsafeProtocols', label: 'detectUnsafeProtocols' }
                 ] },
-                { title: 'detectionSettings', fields: [sensitivity, action] },
-                { title: 'advancedSettings', fields: [
-                    { type: 'checkbox', key: 'allowIntervention', label: 'allowIntervention' }
-                ] }
+                { title: 'detectionSettings', fields: [sensitivity, action] }
             ];
         }
 
         if (moduleKey === 'Trigger-Phrases') {
             return [
                 { title: 'generalSettings', fields: [
-                    { type: 'checkbox', key: 'caseSensitive', label: 'caseSensitive' },
-                    { type: 'checkbox', key: 'allowIntervention', label: 'allowIntervention' }
+                    { type: 'checkbox', key: 'caseSensitive', label: 'caseSensitive' }
                 ] },
                 { title: 'detectionSettings', fields: [sensitivity, action] }
             ];
@@ -277,9 +276,6 @@ class OptionsManager {
 
         if (moduleKey === 'Prompt-Splitting') {
             return [
-                { title: 'generalSettings', fields: [
-                    { type: 'checkbox', key: 'allowIntervention', label: 'allowIntervention' }
-                ] },
                 { title: 'detectionSettings', fields: [
                     { type: 'number', key: 'detectionThreshold', label: 'detectionThreshold', min: 0.1, max: 1, step: 0.1 },
                     action
@@ -289,8 +285,7 @@ class OptionsManager {
 
         return [
             { title: 'generalSettings', fields: [
-                { type: 'checkbox', key: 'monitorOnly', label: 'monitorOnly' },
-                { type: 'checkbox', key: 'allowIntervention', label: 'allowIntervention' }
+                { type: 'checkbox', key: 'monitorOnly', label: 'monitorOnly' }
             ] },
             { title: 'detectionSettings', fields: [action] }
         ];
@@ -300,6 +295,7 @@ class OptionsManager {
         this.populateSelect('language-select', this.config?.language);
         this.populateThemeSwitch();
         this.populateFindingsApiSettings();
+        this.populateActiveRemediationSettings();
         this.populateModuleSettings();
     }
 
@@ -313,6 +309,19 @@ class OptionsManager {
         if (allowlistInput) {
             const allowlist = this.config?.settings?.findingsApiAllowedExtensionIds;
             allowlistInput.value = Array.isArray(allowlist) ? allowlist.join(', ') : '';
+        }
+    }
+
+    populateActiveRemediationSettings() {
+        const enabledInput = document.getElementById('active-remediation-enabled');
+        if (enabledInput) {
+            enabledInput.checked = this.config?.settings?.activeRemediationEnabled === true;
+        }
+
+        const actionSelect = document.getElementById('active-remediation-action');
+        if (actionSelect) {
+            const action = this.config?.settings?.activeRemediationAction;
+            actionSelect.value = REMEDIATION_ACTION_VALUES.includes(action) ? action : 'annotate';
         }
     }
 
@@ -407,12 +416,15 @@ class OptionsManager {
         });
         this.setupListener('findings-api-enabled', 'change', () => {
             this.collectFindingsApiSettings();
+            this.collectActiveRemediationSettings();
             this.scheduleAutoSave();
         });
         this.setupListener('findings-api-allowlist', 'change', () => {
             this.collectFindingsApiSettings();
+            this.collectActiveRemediationSettings();
             // Reflect the normalized list back, so the user sees what was actually stored.
             this.populateFindingsApiSettings();
+            this.populateActiveRemediationSettings();
             this.scheduleAutoSave();
         });
         document.querySelectorAll('input[name="theme"]').forEach((input) => {
@@ -507,6 +519,7 @@ class OptionsManager {
         const selectedTheme = document.querySelector('input[name="theme"]:checked');
         if (selectedTheme) this.config.theme = selectedTheme.value;
         this.collectFindingsApiSettings();
+        this.collectActiveRemediationSettings();
         document.querySelectorAll('[data-module]').forEach((card) => {
             const moduleId = card.dataset.module;
             if (!moduleId || !this.config.modules[moduleId]) return;
@@ -520,6 +533,25 @@ class OptionsManager {
                         : input.value;
             });
         });
+    }
+
+    // Активное вмешательство (TASKS C4.3 / C4.5). Здесь только сохраняется решение пользователя;
+    // откат уже внесённых правок при выключении делает слой в content-скрипте.
+    collectActiveRemediationSettings() {
+        if (!this.config) return;
+        this.config.settings = this.config.settings || {};
+
+        const enabledInput = document.getElementById('active-remediation-enabled');
+        if (enabledInput) {
+            this.config.settings.activeRemediationEnabled = enabledInput.checked === true;
+        }
+
+        const actionSelect = document.getElementById('active-remediation-action');
+        if (actionSelect) {
+            this.config.settings.activeRemediationAction = REMEDIATION_ACTION_VALUES.includes(actionSelect.value)
+                ? actionSelect.value
+                : 'annotate';
+        }
     }
 
     collectFindingsApiSettings() {

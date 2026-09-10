@@ -1,4 +1,7 @@
 const ALLOWED_RESOURCE_TYPES = new Set(['xmlhttprequest', 'image']);
+// @data-list HTTP-методы, которые нормализатор пропускает в метаданные. Устаревание =
+// ТИШИНА по редкому методу (метод вне списка станет неизвестным). Список закрыт RFC 9110,
+// поэтому меняется практически никогда.
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 const MAX_RESPONSE_HEADERS = 64;
 const MAX_RAW_CONTENT_TYPE_LENGTH = 256;

@@ -11,6 +11,9 @@ export default class PromptSplitting extends ModuleCore {
     constructor() {
         super('Prompt-Splitting', false);
         this.usesMutationObserver = true;
+        // Пауза сохраняет находки (см. onPause), поэтому рантайм имеет право вернуть модуль без
+        // рескана, когда документ за время паузы не менялся (C2, контракт resume в ModuleCore).
+        this.keepsStateWhilePaused = true;
         this.maxRecordedFindings = 20;
         this.maxSerializedFindings = 10;
         this.maxInitialElements = 10000;
@@ -33,6 +36,9 @@ export default class PromptSplitting extends ModuleCore {
         this.initialScanTimeBudgetMs = 100;
         this.mutationScanTimeBudgetMs = 25;
         this.mutationThrottle = 500;
+        // Длина собственного куска этого модуля. Мельче ядерного потолка намеренно: коллектор и
+        // движок реконструкции работают длиннее на единицу работы, чем обход DOM.
+        this.workSliceMs = 8;
         this.initialReconstructionLimits = {
             maxRegions: 80,
             maxCandidatesPerRegion: 16,
@@ -95,6 +101,9 @@ export default class PromptSplitting extends ModuleCore {
         this.initialScanInProgress = false;
         this.reconciliationPassPending = false;
         this.reconciliationPasses = 0;
+        // 11.4: «ровно один полный рескан на запрошенную реконсиляцию».
+        this.reconciliationRescanScheduled = false;
+        this.reconciliationRescans = 0;
         this.configRevision = 0;
         this.runtimeRevision = 0;
         this.currentScanConfiguration = null;
@@ -113,12 +122,21 @@ export default class PromptSplitting extends ModuleCore {
         this.lastFindingDiagnostics = null;
         this.candidateElementIds = new WeakMap();
         this.regionAnchorIds = new WeakMap();
+        // C4.3: обратная связь «id региона -> его якорь», нужная слою вмешательства. Развилка
+        // «регион из многих узлов -> какой узел» решена в пользу ЯКОРЯ: это тот самый контейнер,
+        // который коллектор уже считает границей региона, он один на регион и не зависит от того,
+        // какой фрагмент оказался первым. Ссылки живут только внутри скана и стираются в
+        // finishScanConfiguration - тот же контракт, по которому очередь намерений слоя не переживает
+        // скан. Карта наполняется ТОЛЬКО при открытом гейте: при закрытом ссылок на узлы здесь нет.
+        this.scanRegionAnchors = new Map();
+        this.maxScanRegionAnchors = 200;
         this.nextCandidateElementId = 1;
         this.nextRegionAnchorId = 1;
         this.scanRevision = 0;
+        // Расширяем дефолт ядра, а не перезаписываем его: перезапись молча теряет любое поле,
+        // которое ядро добавит позже (C1, разбор 2026-09-09).
         this.observerConfig = {
-            childList: true,
-            subtree: true,
+            ...this.observerConfig,
             attributes: true,
             characterData: true,
             attributeFilter: ['title', 'aria-label', 'alt', 'contenteditable', 'role', 'aria-multiline']
@@ -178,6 +196,8 @@ export default class PromptSplitting extends ModuleCore {
         if (this.currentScanConfiguration === configuration) {
             this.currentScanConfiguration = null;
         }
+        // Ссылки на якоря не переживают скан - тот же контракт, по которому снапшот не содержит узлов.
+        this.scanRegionAnchors.clear();
     }
 
     invalidatePendingWork() {
@@ -243,6 +263,8 @@ export default class PromptSplitting extends ModuleCore {
 
         const scanConfiguration = this.beginScanConfiguration();
         const startTime = performance.now();
+        this.resetSliceAccounting();
+        this.beginWorkSlice();
         this.initialScanInProgress = true;
         this.reconciliationPassPending = false;
         this.resetStats();
@@ -287,7 +309,8 @@ export default class PromptSplitting extends ModuleCore {
     }
 
     async performScan() {
-        await this.firstScan();
+        // Gate plus the level-2 error handler, shared by every module (C7.3).
+        await this.runExplicitScan();
         return {
             module: this.moduleName,
             threatsDetected: this.stats.threatsDetected,
@@ -301,12 +324,18 @@ export default class PromptSplitting extends ModuleCore {
 
     async collectCandidateBatch(root, limits) {
         const scanConfiguration = limits.scanConfiguration || this.beginScanConfiguration();
+        // Свой кусок у этого модуля мельче ядерного (8 мс против 16), и это остаётся так - но
+        // потолок вкладки может опуститься ниже при длинных тасках, и тогда решает он (C2).
+        const workSliceMs = Math.min(this.workSliceMs, this.maxSliceMs);
         const ownsScanConfiguration = !limits.scanConfiguration;
         const isCurrent = () => this.isScanConfigurationCurrent(scanConfiguration);
         const collection = await this.candidateCollector.collect(root, {
-            limits,
+            limits: { ...limits, workSliceMs },
             isCurrent,
-            yieldControl: () => new Promise((resolve) => setTimeout(resolve, 0)),
+            // Уступка через ядро (C2): свой setTimeout не знал ни про общий потолок куска на
+            // вкладку, ни про backoff по длинным таскам, ни про учёт активного времени.
+            yieldControl: () => this.yieldSlice(),
+            isExtensionOwned: (element) => this.isExtensionOwnedElement(element),
             getCandidateId: (element) => {
                 let id = this.candidateElementIds.get(element);
                 if (!id) {
@@ -321,6 +350,9 @@ export default class PromptSplitting extends ModuleCore {
                     id = `region-${this.nextRegionAnchorId++}`;
                     this.regionAnchorIds.set(element, id);
                 }
+                if (this.findingNodeSink && this.scanRegionAnchors.size < this.maxScanRegionAnchors) {
+                    this.scanRegionAnchors.set(id, element);
+                }
                 return id;
             }
         });
@@ -329,7 +361,10 @@ export default class PromptSplitting extends ModuleCore {
         this.currentCandidatesAnalyzed = diagnostics.candidatesCreated;
         this.currentFragmentsCollected = diagnostics.fragmentsCreated;
         this.currentCharactersCollected = diagnostics.charactersRead;
-        this.candidatesSkippedByLimit += diagnostics.elementsSkippedByLimit;
+        // 11.9: одно значение прибавлялось к двум разным именам, и отбраковка кандидата по лимиту
+        // кандидатов считалась ещё и пропуском элемента. У коллектора есть собственный счётчик -
+        // одна единица работы, ровно один счётчик, ровно один раз (C5.3).
+        this.candidatesSkippedByLimit += diagnostics.candidatesSkippedByLimit;
         this.elementsSkippedByLimit += diagnostics.elementsSkippedByLimit;
         this.directNodesSkippedByLimit += diagnostics.childNodesSkippedByLimit;
         this.charactersSkippedByLimit += diagnostics.charactersSkippedByLimit;
@@ -366,15 +401,25 @@ export default class PromptSplitting extends ModuleCore {
         };
         let decisionStatus = 'complete';
         const reconstruction = await this.reconstructionEngine.reconstruct(collection, {
-            limits: limits.reconstructionLimits,
+            limits: { ...limits.reconstructionLimits, workSliceMs },
             isCurrent,
-            yieldControl: () => new Promise((resolve) => setTimeout(resolve, 0)),
+            yieldControl: () => this.yieldSlice(),
             onCandidate: async (reconstructedCandidate) => {
                 const decisionResult = await this.decisionEngine.evaluate(reconstructedCandidate, scanConfiguration.decisionPolicy, {
                     limits: limits.decisionLimits,
                     isCurrent,
                     onEligibleDecision: async (decision, evidence) => {
-                        this.findingState.recordDecision(findingBatch, decision, evidence);
+                        const accepted = this.findingState.recordDecision(findingBatch, decision, evidence);
+                        // C4.3: узел отдаётся только по ПРИНЯТОЙ находке и только пока идёт скан.
+                        // Длинный регион режется на куски с id вида `region-3#1`, а якорь у всех
+                        // кусков один - поэтому ключ берётся до решётки.
+                        if (accepted === true && this.findingNodeSink) {
+                            const anchorId = String(evidence?.regionId || '').split('#')[0];
+                            const anchor = this.scanRegionAnchors.get(anchorId);
+                            if (anchor) {
+                                this.emitFindingNode({ type: 'prompt-splitting' }, anchor);
+                            }
+                        }
                     }
                 });
                 decisionSummary.reconstructedCandidatesEvaluated += 1;
@@ -425,8 +470,14 @@ export default class PromptSplitting extends ModuleCore {
         return reconstruction.status === 'error' ? reconstruction.status : collection.status;
     }
 
-    handleMutations(mutations) {
+    handleMutations(rawMutations) {
         if (!this.isEnabled) {
+            return;
+        }
+
+        // Loop-safety (C4): наши собственные правки не работа страницы.
+        const mutations = this.filterForeignMutations(rawMutations);
+        if (mutations.length === 0) {
             return;
         }
 
@@ -499,8 +550,19 @@ export default class PromptSplitting extends ModuleCore {
     }
 
     enqueueMutationRoot(root) {
+        // 11.7, правило 4 из C5.2: отказ по НЕРЕЛЕВАНТНОСТИ (узел не Element либо уже не в
+        // документе) - это не пропущенная работа. Раньше он шёл в тот же счётчик, что и потеря по
+        // лимиту, а тот транслируется в partial: одна мутация с текстовым узлом делала страницу
+        // «частично просканированной» навсегда, до конца её жизни.
+        const isRelevantRoot = root instanceof Element && root.isConnected;
         const accepted = this.mutationQueue.enqueueRoot(root, (candidate) => candidate instanceof Element && candidate.isConnected);
-        if (!accepted) this.mutationRootsSkippedByLimit += 1;
+        if (!accepted) {
+            if (isRelevantRoot) {
+                this.mutationRootsSkippedByLimit += 1;
+            } else {
+                this.mutationRootsRejectedAsIrrelevant += 1;
+            }
+        }
         return accepted;
     }
 
@@ -532,6 +594,22 @@ export default class PromptSplitting extends ModuleCore {
         return { candidateIds, visited, partial: pending.length > 0 };
     }
 
+    // 11.4: корни, не поместившиеся в батч, исчезали навсегда - takeBatch() опустошает очередь, а
+    // срез до maxMutationRegionsPerBatch выбрасывал остаток. Страница просто оставалась помеченной
+    // partial, и на этом всё: внедрение, попавшее в хвост крупного батча, не анализировалось
+    // никогда. Возврат корней в очередь потребовал бы собственного потолка и рисковал
+    // неограниченной догоняющей очередью, прямо запрещённой контрактом Priority 5, поэтому
+    // переполнение планирует РОВНО ОДИН полный рескан: повторные запросы, пока он не отработал,
+    // новых не создают.
+    scheduleReconciliationRescan() {
+        this.reconciliationPassPending = true;
+        if (this.reconciliationRescanScheduled) {
+            return false;
+        }
+        this.reconciliationRescanScheduled = true;
+        return true;
+    }
+
     scheduleMutationBatch() {
         if (this.initialScanInProgress || this.mutationBatchTimer !== null || this.mutationBatchPromise !== null) {
             return;
@@ -545,13 +623,34 @@ export default class PromptSplitting extends ModuleCore {
             if (!this.isEnabled || runtimeRevision !== this.runtimeRevision || lifecycleRevision !== this.lifecycleRevision) {
                 return;
             }
-            const batchPromise = this.processQueuedMutationBatch(runtimeRevision, lifecycleRevision);
+            // Через гейт C5.1: батч мутаций и полный скан не должны чередоваться на общем
+            // состоянии, а этот путь идёт из setTimeout мимо очереди js/content.js.
+            const batchPromise = this.runGuardedScan(
+                'mutation-batch',
+                () => this.processQueuedMutationBatch(runtimeRevision, lifecycleRevision)
+            );
             this.mutationBatchPromise = batchPromise;
             batchPromise.catch((error) => {
                 Logger.error(`[${this.moduleName}] Error processing mutation roots:`, error);
             }).finally(() => {
                 if (this.mutationBatchPromise === batchPromise) this.mutationBatchPromise = null;
-                if (this.isEnabled && this.mutationQueue.hasPendingWork()) {
+                if (!this.isEnabled
+                    || runtimeRevision !== this.runtimeRevision
+                    || lifecycleRevision !== this.lifecycleRevision) {
+                    return;
+                }
+                // Запрошенная реконсиляция важнее следующего батча: корни, которые в него не
+                // поместились, живут только в этом запросе (11.4).
+                if (this.reconciliationRescanScheduled) {
+                    this.reconciliationRescanScheduled = false;
+                    this.reconciliationRescans += 1;
+                    this.runGuardedScan('reconciliation-rescan', () => this.firstScan())
+                        .catch((error) => {
+                            Logger.error(`[${this.moduleName}] Error running reconciliation rescan:`, error);
+                        });
+                    return;
+                }
+                if (this.mutationQueue.hasPendingWork()) {
                     this.scheduleMutationBatch();
                 }
             });
@@ -581,6 +680,8 @@ export default class PromptSplitting extends ModuleCore {
         if (batch.roots.length > roots.length) {
             this.mutationRootsSkippedByLimit += batch.roots.length - roots.length;
             this.mutationQueue.markOverflow();
+            // Остаток корней уже не в очереди: единственное, что вернёт их работу, - полный рескан.
+            this.scheduleReconciliationRescan();
         }
         this.lastMutationTime = Date.now();
         await this.processMutationRoots(roots, batch.partial || batch.reconciliationRequested);
@@ -643,7 +744,7 @@ export default class PromptSplitting extends ModuleCore {
         const roots = batch.roots.slice(0, this.maxMutationRegionsPerBatch);
         if (batch.roots.length > roots.length) {
             this.mutationRootsSkippedByLimit += batch.roots.length - roots.length;
-            this.reconciliationPassPending = true;
+            this.scheduleReconciliationRescan();
         }
         if (roots.length === 0) {
             if (batch.partial || batch.reconciliationRequested) {
@@ -696,6 +797,8 @@ export default class PromptSplitting extends ModuleCore {
         this.mutationNodesSkippedByLimit = 0;
         this.mutationRootsSkippedByLimit = 0;
         this.mutationRootsSkippedByTime = 0;
+        // Диагностика, а не пропущенная работа: в partial не транслируется (11.7).
+        this.mutationRootsRejectedAsIrrelevant = 0;
         this.scanTimeBudgetReached = 0;
         this.mutationQueueHighWaterMark = 0;
         this.mutationQueueOverflows = 0;
@@ -731,6 +834,32 @@ export default class PromptSplitting extends ModuleCore {
     }
 
     onDestroy() {
+        this.stopScheduledWork();
+        this.recentFindings = [];
+        this.lastCollectorStatus = 'disabled';
+        this.lastReconstructionStatus = 'disabled';
+        this.lastDecisionStatus = 'disabled';
+        this.findingState.clear();
+        this.lastFindingStatus = 'disabled';
+        // Идентичность кандидатов и регионов уходит вместе с находками: без находок она ничего не
+        // описывает, а следующая жизнь модуля начнётся с нуля.
+        this.candidateElementIds = new WeakMap();
+        this.regionAnchorIds = new WeakMap();
+        this.nextCandidateElementId = 1;
+        this.nextRegionAnchorId = 1;
+    }
+
+    // Пауза оставляет находки и снимает всё остальное. Уходит то, что сработало бы в фоновой вкладке
+    // (таймер батча, очередь мутаций, признак идущего скана) и ссылки на узлы, которых слой всё
+    // равно не переживает.
+    // Остаются: findingState и `candidateElementIds`/`regionAnchorIds`. Идентичность обязана
+    // пережить паузу вместе с находками: без неё после возврата тот же элемент получил бы новый id,
+    // и мутация завела бы ВТОРУЮ находку о том же регионе вместо обновления первой.
+    onPause() {
+        this.stopScheduledWork();
+    }
+
+    stopScheduledWork() {
         if (this.mutationBatchTimer !== null) {
             clearTimeout(this.mutationBatchTimer);
             this.mutationBatchTimer = null;
@@ -740,20 +869,11 @@ export default class PromptSplitting extends ModuleCore {
         this.initialScanInProgress = false;
         this.reconciliationPassPending = false;
         this.currentScanConfiguration = null;
-        this.recentFindings = [];
-        this.lastCollectorStatus = 'disabled';
+        this.scanRegionAnchors.clear();
         this.lastCollectorDiagnostics = null;
-        this.lastReconstructionStatus = 'disabled';
         this.lastReconstructionDiagnostics = null;
-        this.lastDecisionStatus = 'disabled';
         this.lastDecisionDiagnostics = null;
-        this.findingState.clear();
-        this.lastFindingStatus = 'disabled';
         this.lastFindingDiagnostics = null;
-        this.candidateElementIds = new WeakMap();
-        this.regionAnchorIds = new WeakMap();
-        this.nextCandidateElementId = 1;
-        this.nextRegionAnchorId = 1;
     }
 
     getStats() {
@@ -777,6 +897,8 @@ export default class PromptSplitting extends ModuleCore {
             mutationRecordsSkippedByLimit: this.mutationRecordsSkippedByLimit,
             mutationNodesSkippedByLimit: this.mutationNodesSkippedByLimit,
             mutationRootsSkippedByLimit: this.mutationRootsSkippedByLimit,
+            mutationRootsRejectedAsIrrelevant: this.mutationRootsRejectedAsIrrelevant,
+            reconciliationRescans: this.reconciliationRescans,
             mutationRootsSkippedByTime: this.mutationRootsSkippedByTime,
             scanTimeBudgetReached: this.scanTimeBudgetReached,
             collectorStatus: this.lastCollectorStatus,

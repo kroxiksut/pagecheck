@@ -20,16 +20,17 @@
 - Текст кандидата кратковременно нормализуется по whitespace, Unicode NFC/NFKC, регистру, токенам и control-символам.
 - Classifier возвращает metadata-only совпадения для instruction override, authority impersonation, sensitive disclosure, safety bypass, hidden action и supporting-категорий.
 - Risk evaluator применяет детерминированную матрицу evidence/impact/severity и затем фильтрует результат по sensitivity, не изменяя саму оценку.
-- Общий флаг `allowIntervention` по умолчанию включён для тестирования, но модуль пока не аннотирует и не подавляет контент страницы.
+- Модуль не аннотирует и не подавляет контент страницы: его находки о ВИДИМОМ тексте, где раскрытие бессмысленно, а изъятие удалило бы то, что человек читает, - поэтому узлы в слой вмешательства он не отдаёт.
+- Пауза сохраняет находки И `candidateIds`, поэтому возврат на неизменившуюся вкладку обходится без рескана (`keepsStateWhilePaused`). Именно этот WeakMap делает возврат безопасным: тот же элемент сохраняет свой id, поэтому повторный разбор после мутации ОБНОВИТ существующую находку, а не заведёт дубль.
 
 ## Область обнаружения
-- Видимые и скрытые DOM-текстовые фрагменты без оценки их визуального представления.
+- Видимые и скрытые DOM-текстовые фрагменты без оценки их визуального представления. Текст относится к ближайшему владеющему контейнеру; `nav`, `form`, `figure`, `details`, `fieldset` и `body` считаются контейнерами, поэтому текст, вставленный прямо в них, анализируется.
+- Мутация тоже относится к ближайшему владеющему контейнеру: вставка inline-элемента в существующий абзац анализируется, а его удаление снимает finding, записанный на этот абзац.
 - Текстовые атрибуты `title`, `aria-label` и `alt` у `img` и `area`.
 - Фразы, похожие на prompt override, coercion или небезопасные instruction-паттерны.
 
 ## Ключи конфигурации
 - `enabled`
-- `allowIntervention`
 - `customPatterns`
 - `caseSensitive`
 
@@ -41,7 +42,7 @@ Runtime принимает только включённые записи `liter
 
 Built-in rules, normalization, literal matching, semantic classification и risk evaluation предоставляет `modules/semantic-analysis/SemanticAnalysisCore.js`. Этот модуль сохраняет DOM candidate selection, lifecycle, budgets, finding creation и active-finding deduplication. Shared core не получает DOM, Chrome API, storage или lifecycle state и возвращает только metadata assessments.
 
-Persisted-конфигурация валидируется `ConfigManager` и передаётся content-level lifecycle. Перед initial- или mutation-scan детектор формирует неизменяемую effective-конфигурацию только с `caseSensitive` и `sensitivity`, помеченную локальной revision модуля. Пассивные metadata `allowIntervention`, `actionOnDetect`, `name` и `description` не входят в detection-конфигурацию; активацией через `enabled` управляет content lifecycle.
+Persisted-конфигурация валидируется `ConfigManager` и передаётся content-level lifecycle. Перед initial- или mutation-scan детектор формирует неизменяемую effective-конфигурацию только с `caseSensitive` и `sensitivity`, помеченную локальной revision модуля. Пассивные metadata `actionOnDetect`, `name` и `description` не входят в detection-конфигурацию; активацией через `enabled` управляет content lifecycle.
 
 ## Runtime-поведение
 - Загружается из `js/content.js` под идентификатором модуля `Trigger-Phrases`.
@@ -89,11 +90,11 @@ Persisted-конфигурация валидируется `ConfigManager` и �
 - Нельзя сохранять собранный текст страницы или пользовательский ввод.
 - Никогда нельзя анализировать содержимое password-полей.
 - Source пользовательского паттерна должен храниться только в local extension storage и редактироваться в логах.
-- Любая будущая аннотация или подавление контента страницы должны оставаться за `allowIntervention`.
+- Любая будущая аннотация или подавление контента страницы остаются за гейтом рантайма, а не за флагом модуля. Активное вмешательство закрыто гейтом `settings.activeRemediationEnabled` (по умолчанию выключен) и применяется слоем `js/intervention-layer.js`; сам модуль в страницу не пишет.
 
 ## Следующие шаги
 - Проверить lifecycle в Chrome с 50+ восстановленными вкладками, несколькими окнами, быстрым переключением, iframe-heavy страницами и длительными SPA-мутациями.
-- Рассмотреть coalescing mutation roots до batch timer; текущая очередь raw records безопасна, но намеренно ограничена 200 записями.
+- Схлопывание roots больше не обходит всю очередь с `contains()` на каждой вставке: уже стоящий в очереди предок ищется по цепочке родителей, а обратный проход, снимающий вложенные roots, выполняется один раз на batch (и перед переполнением) вместо одного раза на вставку. Очередь по-прежнему намеренно ограничена 200 roots.
 
 ## Интеграция
 - Загружается из `js/content.js`.

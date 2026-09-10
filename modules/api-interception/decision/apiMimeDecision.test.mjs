@@ -59,7 +59,9 @@ for (const overrides of [
     { resourceType: 'xmlhttprequest' },
     { completed: false },
     { networkError: true },
-    { partial: true },
+    // { partial: true } УБРАН: createNormalizedObservation такого поля не создаёт, поэтому кейс
+    // проверял ветку, недостижимую в продакшене, и маскировал мёртвую проверку (TASKS 13.6).
+    // Частичность живёт на уровне батча и проверяется в ApiFindingState.
     { responseStatus: 199 },
     { responseStatus: 204 },
     { responseStatus: 205 },

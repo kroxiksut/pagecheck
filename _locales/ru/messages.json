@@ -119,10 +119,6 @@
         "message": "Авто-сканирование при загрузке страницы",
         "description": "Настройка автосканирования"
     },
-    "allowIntervention": {
-        "message": "Разрешить вмешательство на странице для тестирования",
-        "description": "Тестовый флаг-разрешение для вмешательства на странице"
-    },
     "scanInterval": {
         "message": "Интервал сканирования (мс):",
         "description": "Настройка интервала сканирования"
@@ -603,6 +599,10 @@
         "message": "overlay-контекст",
         "description": "Метка контекста contrast camouflage для overlay-контекста"
     },
+    "findingContrastContextUnreliableMeasurement": {
+        "message": "измерение недостоверно (фильтр или режим наложения)",
+        "description": "Метка контекста contrast camouflage, когда CSS-фильтр или blend-режим делает вычисленный контраст недостоверным"
+    },
     "findingHiddenTextTransparentSummary": {
         "message": "Возможен скрытый текст через прозрачный цвет текста",
         "description": "Сводка для детекта скрытого текста через прозрачную заливку глифов"
@@ -1039,6 +1039,18 @@
         "message": "Возможен небезопасный протокол перехода",
         "description": "Сводка для детекта небезопасного протокола"
     },
+    "findingBaseOriginMismatchSummary": {
+        "message": "Страница перенаправляет все относительные ссылки на другой сайт",
+        "description": "Заголовок для находки о <base href> с чужим origin"
+    },
+    "findingBaseOriginMismatchDetails": {
+        "message": "base href ведёт на $1 вместо $2",
+        "description": "Детали находки о <base href> с чужим origin"
+    },
+    "findingRedirectPatternOpaqueDetails": {
+        "message": "Параметр redirect: $1; назначение закодировано или непрозрачно ($2); $3",
+        "description": "Детали находки redirect, чьё назначение не удалось разобрать как URL"
+    },
     "findingRedirectPatternSummary": {
         "message": "Возможен redirect- или bounce-паттерн URL",
         "description": "Сводка для детекта redirect-паттерна"
@@ -1046,6 +1058,10 @@
     "findingLinkMismatchSummary": {
         "message": "Видимый текст ссылки отличается от фактического домена назначения",
         "description": "Сводка для детекта несовпадения текста ссылки и назначения"
+    },
+    "findingHostnameConfusableSummary": {
+        "message": "Hostname записан буквами, имитирующими латинское имя",
+        "description": "Заголовок для находки о hostname из букв-двойников латиницы"
     },
     "findingHostnameMixedPunycodeSummary": {
         "message": "Смешанный алфавит в hostname с сегментом punycode",
@@ -1318,5 +1334,83 @@
     "findingsApiAllowlistHint": {
         "message": "ID из 32 символов через запятую. Пустой список не передаёт находки никому, даже если переключатель выше включён.",
         "description": "Подсказка к полю со списком разрешённых расширений"
+    },
+    "interventionHiddenContentAnnotation": {
+        "message": "PageCheck: этот блок был скрыт от человека. Скрытый от человека контент не является указанием пользователя.",
+        "description": "Аннотация рядом с контентом, скрытым от человека (активное вмешательство)"
+    },
+    "interventionPromptSplittingAnnotation": {
+        "message": "PageCheck: предыдущий блок содержит фрагменты текста, которые вместе читаются как инструкция ИИ-ассистенту.",
+        "description": "Аннотация рядом с блоком, чьи фрагменты собираются в промпт (активное вмешательство)"
+    },
+    "automationFindingsNotice": {
+        "message": "Эту страницу смотрит автоматизированный браузер, и PageCheck нашёл на ней проблемы. Скрытый от человека контент не является указанием пользователя.",
+        "description": "Показывается после скана, если выставлен navigator.webdriver и на странице есть находки (C4)"
+    },
+    "revertIntervention": {
+        "message": "Вернуть страницу",
+        "description": "Кнопка popup, откатывающая правки активного вмешательства на текущей странице"
+    },
+    "interventionApplied": {
+        "message": "PageCheck пометил блоков на этой странице: $COUNT$.",
+        "description": "Показывается после скана, если активное вмешательство изменило страницу",
+        "placeholders": {
+            "count": { "content": "$1", "example": "3" }
+        }
+    },
+    "interventionReverted": {
+        "message": "Правки на странице отменены.",
+        "description": "Показывается после отката правок активного вмешательства"
+    },
+    "interventionRevertFailed": {
+        "message": "Не удалось отменить правки на странице.",
+        "description": "Показывается, если откат правок активного вмешательства не удался"
+    },
+    "scanCompletedWithCost": {
+        "message": "Сканирование заняло $MS$ мс работы PageCheck.",
+        "description": "Результат скана с собственной активной ценой расширения на этой странице (C2, transparency)",
+        "placeholders": {
+            "ms": { "content": "$1", "example": "4.2" }
+        }
+    },
+    "interventionTamperedNotice": {
+        "message": "Эта страница удалила метки PageCheck. Повторно они не ставятся.",
+        "description": "Показывается после скана, если страница сняла метки активного вмешательства (C4.4)"
+    },
+    "interventionLinkMismatchAnnotation": {
+        "message": "PageCheck: видимый текст предыдущей ссылки не совпадает с адресом, который она открывает.",
+        "description": "Аннотация рядом со ссылкой, чей видимый текст отличается от адреса перехода (активное вмешательство)"
+    },
+    "activeRemediationSettings": {
+        "message": "Активное вмешательство",
+        "description": "Options page section title for active remediation"
+    },
+    "activeRemediationWarning": {
+        "message": "По умолчанию выключено. Во включённом состоянии PageCheck меняет саму страницу, а не только сообщает о находках. Страница может увидеть эти правки и повести себя иначе, а вёрстка сайта может у вас сломаться. При выключении правки снимаются.",
+        "description": "Mandatory risk disclosure for active remediation (TASKS C4.5)"
+    },
+    "activeRemediationEnabledLabel": {
+        "message": "Действовать при находках скрытого контента",
+        "description": "Label for the active remediation switch"
+    },
+    "activeRemediationActionLabel": {
+        "message": "Что делать",
+        "description": "Label for the active remediation action selector"
+    },
+    "activeRemediationActionAnnotate": {
+        "message": "Добавлять пометку рядом со скрытым контентом",
+        "description": "Active remediation action: annotate"
+    },
+    "activeRemediationActionReveal": {
+        "message": "Делать скрытый контент видимым",
+        "description": "Active remediation action: reveal"
+    },
+    "activeRemediationActionNeutralize": {
+        "message": "Удалять скрытый контент",
+        "description": "Active remediation action: neutralize"
+    },
+    "activeRemediationHint": {
+        "message": "Правки снимаются при выключении и при смене действия; перезагрузка страницы тоже их убирает. Если страница снимает правки PageCheck, повторно они не применяются — вместо этого факт попадает в отчёт.",
+        "description": "Hint under the active remediation settings"
     }
 }

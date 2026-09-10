@@ -5,6 +5,16 @@ export default class ApiInterceptor extends ModuleCore {
     constructor() {
         super('Api-Interceptor', false);
         this.usesMutationObserver = true;
+        // 14.1: наблюдатель обязан видеть те же атрибуты, которые ищет scanElement. Без этого
+        // подменённый НА МЕСТЕ `src` или `action` в DOM-путь не попадал вовсе: childList такой
+        // мутации не порождает. Фильтр узкий по той же причине, что и в link-domain-security:
+        // `attributes: true` прогнал бы через конвейер каждое изменение class/style анимированной
+        // страницы.
+        this.observerConfig = {
+            ...this.observerConfig,
+            attributes: true,
+            attributeFilter: ['action', 'src', 'data-api', 'data-endpoint']
+        };
         this.maxRecordedFindings = 20;
         this.maxSerializedFindings = 10;
         this.maxInitialElements = 10000;
@@ -30,7 +40,7 @@ export default class ApiInterceptor extends ModuleCore {
         this.currentCandidateLimit = this.maxInitialCandidates;
         this.currentElementsVisited = 0;
         this.currentCandidatesAnalyzed = 0;
-        this.currentScanDeadline = Number.POSITIVE_INFINITY;
+        this.currentScanBudgetMs = Number.POSITIVE_INFINITY;
         this.scanTimeBudgetReachedInBatch = false;
         this.resetWorkStats();
     }
@@ -51,8 +61,9 @@ export default class ApiInterceptor extends ModuleCore {
         );
 
         try {
-            this.collectElementsFromRoot(document.documentElement);
+            await this.collectElementsFromRoot(document.documentElement);
             this.scanRevision += 1;
+            this.finishWorkSlice();
             const duration = performance.now() - startTime;
             this.stats.lastScanTime = duration;
             this.stats.totalScanTime = duration;
@@ -66,16 +77,10 @@ export default class ApiInterceptor extends ModuleCore {
     }
 
     async performScan() {
-        await this.firstScan();
-        return {
-            module: this.moduleName,
-            threatsDetected: this.stats.threatsDetected,
-            findings: this.recentFindings.slice(0, this.maxSerializedFindings),
-            findingsTruncated: this.recentFindings.length > this.maxSerializedFindings,
-            revision: this.scanRevision,
-            ...this.getSnapshotState(),
-            stats: this.getStats()
-        };
+        // Gate plus the level-2 error handler, shared by every module (C7.3).
+        await this.runExplicitScan();
+        // Форма снапшота живёт в ядре (C1).
+        return this.buildScanSnapshot();
     }
 
     scanElement(element) {
@@ -83,6 +88,12 @@ export default class ApiInterceptor extends ModuleCore {
             || !this.isEnabled
             || this.processedCandidateElements.has(element)
             || this.isTimeBudgetReached()) {
+            return;
+        }
+
+        // Loop-safety (C4): узел, вставленный расширением, кандидатом быть не может - иначе
+        // наша собственная метка становится находкой, а находка - поводом для следующей метки.
+        if (this.isExtensionOwnedElement(element)) {
             return;
         }
 
@@ -142,20 +153,34 @@ export default class ApiInterceptor extends ModuleCore {
         });
     }
 
-    collectElementsFromRoot(root) {
+    async collectElementsFromRoot(root) {
         if (!(root instanceof Element) || !root.isConnected || !this.isEnabled) {
             return;
         }
 
         const pendingElements = [root];
         while (pendingElements.length > 0) {
+            // Frontier counters are a LOWER BOUND on the skipped work - see C5.3 in the root TASKS.
+            // `traversalAborted` carries "we do not know how much is left"; the same contract is
+            // implemented in link-domain-security, which carries a verbatim copy of this loop.
             if (this.currentElementsVisited >= this.currentElementLimit) {
                 this.elementsSkippedByLimit += pendingElements.length;
+                this.traversalAborted = true;
                 break;
             }
             if (this.isTimeBudgetReached()) {
                 this.elementsSkippedByTime += pendingElements.length;
+                this.traversalAborted = true;
                 break;
+            }
+            // Потолок синхронного куска отдельно от бюджета скана (C2): бюджет отвечает «сколько
+            // работы всего», потолок - «сколько работы подряд».
+            if (this.shouldYieldSlice()) {
+                await this.yieldSlice();
+                if (!this.isEnabled) {
+                    this.traversalAborted = true;
+                    break;
+                }
             }
 
             const element = pendingElements.pop();
@@ -167,8 +192,10 @@ export default class ApiInterceptor extends ModuleCore {
             this.stats.elementsScanned += 1;
             try {
                 this.scanElement(element);
-            } catch {
-                Logger.warn(`[${this.moduleName}] API surface candidate skipped after an internal error`);
+            } catch (error) {
+                // Level 1 (C5.6): a swallowed error used to be invisible - the candidate was gone
+                // and the page still called itself fully analysed.
+                this.recordUnitError('api-surface-candidate', error);
             }
 
             const availableQueueSlots = Math.max(
@@ -185,8 +212,14 @@ export default class ApiInterceptor extends ModuleCore {
         }
     }
 
-    handleMutations(mutations) {
+    handleMutations(rawMutations) {
         if (!this.isEnabled) {
+            return;
+        }
+
+        // Loop-safety (C4): наши собственные правки не работа страницы.
+        const mutations = this.filterForeignMutations(rawMutations);
+        if (mutations.length === 0) {
             return;
         }
 
@@ -199,6 +232,27 @@ export default class ApiInterceptor extends ModuleCore {
         mutationLoop:
         for (let mutationIndex = 0; mutationIndex < recordLimit; mutationIndex += 1) {
             const mutation = mutations[mutationIndex];
+
+            // 14.1: правка атрибута на месте. Элемент ставится корнем сам - поддерево тут ни при
+            // чём, изменился он.
+            if (mutation.type === 'attributes') {
+                const target = mutation.target;
+                if (!(target instanceof Element) || !target.isConnected) {
+                    continue;
+                }
+                if (this.pendingMutationRoots.size >= this.maxPendingMutationRoots) {
+                    this.mutationRootsSkippedByLimit += 1;
+                    this.mutationRecordsSkippedByLimit += Math.max(0, recordLimit - mutationIndex - 1);
+                    break mutationLoop;
+                }
+                // Развилка, записанная при заведении пункта, решается здесь: без снятия отметки
+                // ветка бесполезна. `processedCandidateElements` отвечает на вопрос «этот элемент уже
+                // разобран», а после подмены атрибута прежний ответ описывает прежнее значение.
+                this.processedCandidateElements.delete(target);
+                this.addMutationRoot(target);
+                continue;
+            }
+
             if (mutation.type !== 'childList') {
                 continue;
             }
@@ -213,8 +267,10 @@ export default class ApiInterceptor extends ModuleCore {
             }
             for (let nodeIndex = 0; nodeIndex < nodeLimit; nodeIndex += 1) {
                 if (this.pendingMutationRoots.size >= this.maxPendingMutationRoots) {
+                    // One unit of work, one counter, once (C5.3).
                     this.mutationRootsSkippedByLimit += 1;
-                    this.mutationRecordsSkippedByLimit += recordLimit - mutationIndex;
+                    this.mutationNodesSkippedByLimit += nodeLimit - nodeIndex;
+                    this.mutationRecordsSkippedByLimit += Math.max(0, recordLimit - mutationIndex - 1);
                     break mutationLoop;
                 }
 
@@ -233,10 +289,6 @@ export default class ApiInterceptor extends ModuleCore {
         if (this.pendingMutationRoots.size > 0) {
             this.scheduleMutationBatch();
         }
-    }
-
-    processMutation(mutation) {
-        this.handleMutations([mutation]);
     }
 
     addMutationRoot(root) {
@@ -265,7 +317,7 @@ export default class ApiInterceptor extends ModuleCore {
         }
 
         const delay = Math.max(0, this.mutationThrottle - (Date.now() - this.lastMutationTime));
-        this.mutationBatchTimer = setTimeout(() => {
+        this.mutationBatchTimer = setTimeout(async () => {
             this.mutationBatchTimer = null;
             const roots = [...this.pendingMutationRoots];
             this.pendingMutationRoots.clear();
@@ -274,14 +326,15 @@ export default class ApiInterceptor extends ModuleCore {
             }
 
             this.lastMutationTime = Date.now();
-            this.processMutationRoots(roots);
+            // Через гейт C5.1: батч уступает event-loop и теперь может чередоваться со сканом.
+            await this.runGuardedScan('mutation-batch', () => this.processMutationRoots(roots));
             if (this.pendingMutationRoots.size > 0) {
                 this.scheduleMutationBatch();
             }
         }, delay);
     }
 
-    processMutationRoots(roots) {
+    async processMutationRoots(roots) {
         const startTime = performance.now();
         this.beginScanBatch(
             this.maxMutationElements,
@@ -295,7 +348,7 @@ export default class ApiInterceptor extends ModuleCore {
                     this.mutationRootsSkippedByTime += 1;
                     break;
                 }
-                this.collectElementsFromRoot(root);
+                await this.collectElementsFromRoot(root);
             }
             this.scanRevision += 1;
             const duration = performance.now() - startTime;
@@ -313,13 +366,17 @@ export default class ApiInterceptor extends ModuleCore {
         this.currentCandidateLimit = candidateLimit;
         this.currentElementsVisited = 0;
         this.currentCandidatesAnalyzed = 0;
-        this.currentScanDeadline = performance.now() + timeBudgetMs;
+        // Бюджет измеряет АКТИВНУЮ работу, а не стенные часы: обход уступает event-loop, и часы
+        // включали бы в бюджет чужое время - слайсинг выключал бы сам себя на первой уступке (C2).
+        this.currentScanBudgetMs = timeBudgetMs;
+        this.resetSliceAccounting();
+        this.beginWorkSlice();
         this.scanTimeBudgetReachedInBatch = false;
         this.processedCandidateElements = new WeakSet();
     }
 
     isTimeBudgetReached() {
-        if (performance.now() <= this.currentScanDeadline) {
+        if (this.getScanActiveMs() <= this.currentScanBudgetMs) {
             return false;
         }
 
@@ -331,6 +388,7 @@ export default class ApiInterceptor extends ModuleCore {
     }
 
     resetWorkStats() {
+        this.traversalAborted = false;
         this.candidatesSkippedByLimit = 0;
         this.elementsSkippedByLimit = 0;
         this.elementsSkippedByTime = 0;
@@ -343,21 +401,32 @@ export default class ApiInterceptor extends ModuleCore {
         this.scanTimeBudgetReached = 0;
     }
 
+    // Same three-signal shape as the other DOM-walking modules (C5.2 in the root TASKS):
+    // budgetReached is about limits and time, partialResult is about coverage, contentTruncated is
+    // about analysing a unit on shortened data. A target skipped for being over the length cap was
+    // never analysed, so it belongs to coverage; the truncation flag reports it separately.
     getSnapshotState() {
-        const partialResult = this.candidatesSkippedByLimit > 0
+        const budgetReached = this.candidatesSkippedByLimit > 0
             || this.elementsSkippedByLimit > 0
             || this.elementsSkippedByTime > 0
-            || this.targetsSkippedByLength > 0
             || this.mutationRecordsSkippedByLimit > 0
             || this.mutationNodesSkippedByLimit > 0
             || this.mutationRootsSkippedByLimit > 0
             || this.mutationRootsSkippedByTime > 0
             || this.scanTimeBudgetReached > 0;
+        // A unit skipped because it threw is a coverage gap like any other (C5.6).
+        const partialResult = budgetReached
+            || this.traversalAborted
+            || this.scanFailed
+            || this.unitErrorCount > 0
+            || this.targetsSkippedByLength > 0;
 
         return {
             status: partialResult ? 'partial' : 'complete',
             partialResult,
-            budgetReached: partialResult
+            budgetReached,
+            contentTruncated: this.targetsSkippedByLength > 0,
+            traversalAborted: this.traversalAborted
         };
     }
 
@@ -368,7 +437,7 @@ export default class ApiInterceptor extends ModuleCore {
         }
         this.pendingMutationRoots.clear();
         this.processedCandidateElements = new WeakSet();
-        this.currentScanDeadline = Number.NEGATIVE_INFINITY;
+        this.currentScanBudgetMs = 0;
         this.recentFindings = [];
     }
 

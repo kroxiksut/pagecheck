@@ -1,10 +1,13 @@
-export function createFinding({ type, summary, details, severity = 'medium', detector = 'unknown' }) {
+// Extra fields (currently `dedupeKey`) are passed through: the identity of a finding is decided by
+// the detector that knows what makes two findings the same problem (TASKS 6.4).
+export function createFinding({ type, summary, details, severity = 'medium', detector = 'unknown', ...metadata }) {
     return {
         type,
         summary,
         details,
         severity,
-        detector
+        detector,
+        ...metadata
     };
 }
 

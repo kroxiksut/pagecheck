@@ -65,10 +65,14 @@ const makeElement = ({ computed = {}, inline = {}, text = SHORT_TEXT, id = '', c
     tagName: 'DIV',
     id,
     className,
+    nodeType: 1,
     style: inline,
     computed: { ...BASE_COMPUTED, ...computed },
     rect: { left: 0, top: 0, right: 200, bottom: 40, width: 200, height: 40 },
     textContent: text,
+    // Текстовый узел держится в синхроне с textContent: часть проверок детектора идёт ограниченным
+    // обходом childNodes, а не чтением textContent.
+    childNodes: text ? [{ nodeType: 3, data: text }] : [],
     clientWidth: 200,
     scrollWidth: 200,
     parentElement: null,

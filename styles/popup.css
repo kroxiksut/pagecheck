@@ -393,6 +393,9 @@ body.pagecheck-theme-dark .popup-container {
     --footer-version: #9aa0a6;
 }
 
+/* body.pagecheck-theme-auto: промежуточная палитра, пока грузится файл темы, и палитра
+   аварийного пути ThemeManager.loadFallbackTheme(), где таблица стилей остаётся пустой.
+   В обычном режиме класс живёт доли секунды - это не мёртвые правила (TASKS C6.9). */
 @media (prefers-color-scheme: dark) {
     body.pagecheck-theme-auto .popup-container {
         --popup-bg: #202124;

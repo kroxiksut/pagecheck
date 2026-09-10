@@ -1,4 +1,4 @@
-Chrome PageCheck/
+﻿Chrome PageCheck/
 |
 |-- _locales/
 |   |-- en/
@@ -13,36 +13,46 @@ Chrome PageCheck/
 |
 |-- modules/
 |   |-- ModuleCore.js
+|   |-- timeSlicing.test.mjs                  # shield: cooperative slicing, active-time budgets, pause during a yield (C2)
+|   |-- loopSafety.test.mjs                   # shield: the extension's own DOM edits never become work or findings (C4)
+|   |-- *.test.mjs                          # core-contract shield tests (scan exclusion, error policy)
 |   |-- semantic-analysis/
 |   |   |-- SemanticAnalysisCore.js
 |   |   |-- semanticCatalog.js
 |   |   |-- SemanticAnalysisCore.test.mjs
+|   |   |-- coreDefects.test.mjs             # shield tests for the Priority 1 defects (rule shape, U+FEFF flags, overlap scan, partial)
+|   |   |-- fallbackTokenization.test.mjs    # the tokenization branch without Intl.Segmenter (ranges, mapping reliability)
 |   |   |-- run-tests.cjs
 |   |   |-- README.md
 |   |   `-- README.ru.md
 |   |-- visual-manipulation/
 |   |   |-- VisualManipulationDetector.js
+|   |   |-- *.test.mjs                      # module-level shield tests (scan budget, dedupe keys, pause keeps findings)
 |   |   |-- detectors/
 |   |   |   |-- hiddenTextDetector.js
 |   |   |   |-- hiddenInputDetector.js
 |   |   |   |-- overlayDetector.js
 |   |   |   |-- styleObfuscationDetector.js
-|   |   |   `-- *Detector.test.mjs
+|   |   |   `-- *.test.mjs                  # detector shield tests
 |   |   |-- utils/
 |   |   |   |-- domUtils.js
-|   |   |   |-- domUtilsParsers.test.mjs
+|   |   |   |-- severityModel.js
+|   |   |   |-- *.test.mjs                  # pure-helper tests (parsers, candidate text, severity, finding factory)
 |   |   |   `-- findingFactory.js
 |   |   |-- README.md
 |   |   `-- README.ru.md
 |   |-- link-domain-security/
 |   |   |-- LinkDomainSecurityDetector.js
+|   |   |-- *.test.mjs                      # module-level shield tests (finding identity, hostname memo, error visibility, base URI, formaction)
 |   |   |-- detectors/
 |   |   |   |-- hostnameSecurityDetector.js
 |   |   |   |-- navigationTargetDetector.js
-|   |   |   `-- visibleMismatchDetector.js
+|   |   |   |-- visibleMismatchDetector.js
+|   |   |   `-- *.test.mjs                  # detector shield tests (generic finding suppressed by a precise one)
 |   |   |-- utils/
 |   |   |   |-- domainUtils.js
 |   |   |   |-- urlUtils.js
+|   |   |   |-- *.test.mjs                  # pure-helper tests (TLD guard, confusables, redirects)
 |   |   |   `-- findingFactory.js
 |   |   |-- README.md
 |   |   |-- README.ru.md
@@ -50,11 +60,18 @@ Chrome PageCheck/
 |   |       `-- link-domain-security.html
 |   |-- trigger-phrases/
 |   |   |-- TriggerPhrases.js
+|   |   |-- candidateOwnership.test.mjs      # shield tests for owning-container attribution and mutation budgets
+|   |   |-- initialScanCounters.test.mjs    # shield: the initial scan reports its own counters, not the reconciliation batch (10.5)
+|   |   |-- mutationRootCoalescing.test.mjs # shield: root coalescing without Node.contains() passes over the queue (10.8)
+|   |   |-- telemetryPublication.test.mjs   # shield: out-of-scan serialization must not mutate published telemetry (10.6)
+|   |   |-- pauseKeepsFindings.test.mjs     # shield: pause keeps findings and candidate identity, destroy clears them (C2)
 |   |   |-- README.md
 |   |   `-- README.ru.md
 |   |-- prompt-splitting/
 |   |   |-- PromptSplitting.js
 |   |   |-- PromptSplittingConfig.test.mjs
+|   |   |-- mutationQueueAccounting.test.mjs # shield: overflow schedules exactly one rescan; skip counters stay distinct (11.4/11.7/11.9)
+|   |   |-- pauseKeepsFindings.test.mjs     # shield: pause keeps findings and region identity, destroy clears them (C2)
 |   |   |-- collectors/
 |   |   |   |-- PromptCandidateCollector.js
 |   |   |   `-- PromptCandidateCollector.test.mjs
@@ -64,13 +81,15 @@ Chrome PageCheck/
 |   |   |   |-- PromptFindingState.js
 |   |   |   |-- PromptFindingState.test.mjs
 |   |   |   |-- PromptReconstructionEngine.js
-|   |   |   `-- PromptReconstructionEngine.test.mjs
+|   |   |   |-- PromptReconstructionEngine.test.mjs
+|   |   |   `-- partialSemantics.test.mjs    # shield tests for what `partial` means at each level
 |   |   |-- runtime/
 |   |   |   |-- PromptMutationQueue.js
 |   |   |   `-- PromptMutationQueue.test.mjs
 |   |   |-- tests/
 |   |   |   |-- PromptSplittingCorpus.test.mjs
 |   |   |   |-- PromptSplittingCorpus.v1.mjs
+|   |   |   |-- PromptSplittingDefaultPolicy.test.mjs  # the corpus on the SHIPPED default policy (C5.5)
 |   |   |   |-- PromptSplittingPilotCorpus.test.mjs
 |   |   |   `-- PromptSplittingPilotCorpus.v1.mjs
 |   |   |-- fixtures/
@@ -81,6 +100,7 @@ Chrome PageCheck/
 |   |   `-- README.ru.md
 |   `-- api-interception/
 |       |-- ApiInterceptor.js
+|       |-- attributeMutations.test.mjs        # shield: in-place attribute swaps reach the DOM path (14.1)
 |       |-- decision/
 |       |   |-- apiMimeDecision.js
 |       |   `-- apiMimeDecision.test.mjs
@@ -114,15 +134,22 @@ Chrome PageCheck/
 |
 |-- js/
 |   |-- background.js
+|   |-- backgroundRuntime.test.mjs           # core-contract shield tests (listener registration, config reapply, scan target)
 |   |-- content.js
 |   |-- findings-api.js
+|   |-- intervention-layer.js               # active remediation: intention queue, applied-edit registry, rollback (C4.3)
+|   |-- interventionLayer.test.mjs          # shield: gate closed by default, marks are ours, disabling reverts, link and region notes go beside the node (C4.3)
 |   |-- findings-api.test.mjs
 |   |-- info-page.js
 |   |-- popup.js
+|   |-- snapshotShape.test.mjs               # shield: one snapshot shape for both paths (C1) + shared per-tab slice cap (C2)
+|   |-- startupNoScan.test.mjs               # shield: startup, session restore and SW restart wake at most one tab (C2)
+|   |-- tabSwitchRescan.test.mjs             # shield: returning to an unchanged tab does not rescan (C2)
 |   `-- options.js
 |
 |-- platform/
-|   `-- browser.js
+|   |-- browser.js
+|   `-- browser.test.mjs                     # shield: Chrome callback vs Firefox promise, lastError, missing area, sync throw
 |
 |-- ui/
 |   |-- about.html
@@ -136,8 +163,11 @@ Chrome PageCheck/
 |
 |-- utils/
 |   |-- config-manager.js
+|   |-- configPersistence.test.mjs           # shield tests for config durability (deferred sync write, local fallback, migration)
 |   |-- i18n.js
 |   |-- logger.js
+|   |-- logger.test.mjs                      # shield test for log level validation
+|   |-- settingsValidation.test.mjs          # shield: every string-valued setting has an allowed-value list (C4.2)
 |   `-- theme-manager.js
 |
 |-- styles/
@@ -158,6 +188,9 @@ Chrome PageCheck/
 |   `-- certify-local-release.mjs
 |
 |-- tests/
+|   |-- encoding.test.mjs
+|   |-- data-lists.test.mjs                  # shield: every offline data list carries @data-list with its staleness direction (C7.2)
+|   |-- i18n-coverage.test.mjs               # shield: EN/RU key parity, every data-i18n key translated
 |   |-- manifest-contract.test.mjs
 |   `-- release-certification.test.mjs
 |
@@ -179,6 +212,10 @@ The tree above lists only files intended for the public source repository. Inter
 ### `scripts/build-extension.mjs` and `manifests/manifest.firefox.overlay.json`
 Dependency-free local packaging for Chrome, Edge, and Firefox. The root manifest remains the canonical Chromium source; the Firefox overlay projects an event-page module background, excludes DNR artifacts, and intentionally has no Gecko ID. Generated `dist/` artifacts are disposable and excluded from packages.
 
+### `tests/encoding.test.mjs`
+
+Deterministic UTF-8 contract for the **shipped** file set (the same filter `scripts/build-extension.mjs` uses). Rejects files that are not valid UTF-8 and the byte sequences that appear when UTF-8 text is read as cp1251 and written back. Locale files are additionally parsed as JSON. Development docs are not shipped and are not scanned, so `TASKS.ru.md` may quote damaged bytes as evidence.
+
 ### `tests/manifest-contract.test.mjs`
 Deterministic manifest and package-inventory checks. They verify that source Chrome/Edge manifests remain unchanged, the Firefox projection excludes unsupported DNR material, and development files cannot enter generated artifacts.
 
@@ -189,6 +226,9 @@ Dependency-free local pre-certification. It writes ignored, local evidence for s
 ### `tests/release-certification.test.mjs`
 
 Deterministic contract for the local evidence generator. It verifies byte-stable repeated generation, candidate identity fields, privacy-safe evidence shape, and the required `reject` result while legacy DNR material and the quarantined DOM stub remain.
+
+### `modules/*.test.mjs`
+Shield tests for the contracts `ModuleCore` owns: one analysis pass at a time (C5.1) and the three-level error policy (C5.6). They drive `ModuleCore` directly, without any module.
 
 ### `modules/ModuleCore.js`
 Shared lifecycle base for security modules. Its default detector hooks are deliberately passive: inheriting from `ModuleCore` does not scan the DOM and does not install a `MutationObserver`. A module that needs continuous DOM observation must explicitly set `usesMutationObserver = true` and implement a bounded `handleMutations()` pipeline. Initial analysis likewise requires a bounded module-specific `firstScan()` implementation. `updateConfig()` returns an optional lifecycle-impact result; the default is `{ requiresDetectionRefresh: false }`, while a module may request a serialized refresh after applying a complete validated configuration snapshot.
@@ -233,16 +273,19 @@ Grouped stub detectors for hidden text, hidden inputs, overlays, style obfuscati
 Shared small DOM helper functions used only by the visual-manipulation module.
 
 ### `modules/visual-manipulation/utils/findingFactory.js`
-Shared finding-shape helpers for consistent passive findings returned by the visual-manipulation module.
+Shared finding-shape helpers for consistent passive findings returned by the visual-manipulation module. Also the single place where the module's severity vocabulary is enforced on every finding.
+
+### `modules/visual-manipulation/utils/severityModel.js`
+Severity vocabulary of the module (`low`/`medium`/`high`) and the two pure operations that move a verdict along it. Shares its levels with `semantic-analysis` so a level means the same thing in the UI and in the findings API; the resolution rule itself stays per-module.
 
 ### `modules/link-domain-security/LinkDomainSecurityDetector.js`
 Main module entry point for link and domain analysis. Keeps the existing module API and orchestrates internal detector files.
 
 ### `modules/link-domain-security/detectors/*.js`
-Grouped stub detectors for hostname analysis, target navigation analysis, and visible-text mismatch checks.
+Grouped stub detectors for hostname analysis, target navigation analysis, and visible-text mismatch checks. Navigation-target analysis also owns the page-level `<base href>` check, because that is the same question - where navigation actually goes - asked about the document instead of one link.
 
 ### `modules/link-domain-security/utils/*.js`
-Shared helpers for URL parsing, domain checks, and finding normalization used only by the link-domain-security module.
+Shared helpers for URL parsing, domain checks, and finding normalization used only by the link-domain-security module. `domainUtils.js` carries the two lists that decide whether a caption label is a zone: the TLD allowlist and the file-extension override that wins over it.
 
 ### `modules/api-interception/ApiInterceptor.js`
 Quarantined legacy content-side DOM stub. It is not imported, activated, or used as a snapshot source; physical removal waits for the required Chrome migration validation.

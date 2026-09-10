@@ -37,7 +37,30 @@ export class BackgroundManager {
         this.apiPermissionState = null;
         this.pageStatusCacheWriteTimer = null;
         this.findingsApiRateLimiter = createRateLimiter();
-        this.init();
+        this.configChangeInFlight = null;
+        this.configChangePending = false;
+        this.foreignSyncChangeSeen = false;
+        this.apiPermissionReconcilePending = false;
+
+        // Слушатели регистрируются СИНХРОННО, до любого await. В MV3 событие, разбудившее worker,
+        // диспатчится сразу после того, как вычисление скрипта завершилось; раньше регистрация
+        // жила внутри init() за `await ConfigManager.getConfig()`, поэтому вычисление завершалось с
+        // нулём слушателей и разбудившее событие терялось - переключение вкладки после простоя не
+        // активировало новую foreground-вкладку, а sendMessage из popup получал «Receiving end does
+        // not exist» (TASKS C6.1). Асинхронная часть теперь ждёт ВНУТРИ обработчика: обработчик
+        // ждёт готовности конфигурации, а не наоборот.
+        this.setupMessageListeners();
+        this.setupEventListeners();
+        this.setupPermissionListeners();
+        this.setupStorageListeners();
+
+        this.readyPromise = this.init();
+    }
+
+    // Единственная точка ожидания готовности. Ошибка инициализации не должна навсегда запирать
+    // обработчики: init() ловит собственные ошибки, а здесь стоит второй рубеж.
+    whenReady() {
+        return (this.readyPromise || Promise.resolve()).catch(() => undefined);
     }
 
     async init() {
@@ -50,7 +73,9 @@ export class BackgroundManager {
             });
             this.apiFindingState = new ApiFindingState();
             this.apiResourceObserver = new ApiResourceObserver({
-                webRequest: chrome.webRequest,
+                // webRequest сюда БОЛЬШЕ НЕ ПЕРЕДАЁТСЯ: разрешение опциональное, при чистом старте
+                // service worker его ещё нет, и захваченный undefined жил бы до перезапуска SW
+                // (TASKS 13.2). Наблюдатель резолвит namespace лениво, в момент активации.
                 onStateChange: (state) => {
                     this.apiObservationState = state;
                     if (state.partial === true) {
@@ -75,11 +100,6 @@ export class BackgroundManager {
                 }
             });
 
-            this.setupMessageListeners();
-            this.setupEventListeners();
-            this.setupPermissionListeners();
-            this.setupStorageListeners();
-
             await this.restorePageStatusCache();
             await this.restoreActiveTabs();
             await this.apiPermissionCoordinator.reconcile();
@@ -103,6 +123,10 @@ export class BackgroundManager {
 
             const handleAsync = async () => {
                 try {
+                    // Сообщение могло разбудить worker: сначала дожидаемся конфигурации и
+                    // наблюдателей, потом отвечаем (TASKS C6.1).
+                    await this.whenReady();
+
                     let response;
 
                     switch (request.action) {
@@ -146,7 +170,7 @@ export class BackgroundManager {
                             break;
 
                         case 'scanPage':
-                            response = await this.handleScanPage(request.tabId || request.tab?.id || sender.tab?.id);
+                            response = await this.handleScanPage(request.tabId || request.tab?.id || sender.tab?.id, sender);
                             break;
                         case 'pageStatusUpdate':
                             response = this.handlePageStatusUpdate(request.data, sender);
@@ -196,24 +220,29 @@ export class BackgroundManager {
         }
 
         chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
-            let response;
-            try {
-                response = handleFindingsApiRequest(request, sender, {
-                    config: this.config,
-                    extensionVersion: chrome.runtime.getManifest().version,
-                    rateLimiter: this.findingsApiRateLimiter,
-                    now: Date.now(),
-                    getForegroundSnapshot: () => this.getForegroundFindingsSnapshot()
-                });
-            } catch (error) {
-                // Never surface internal failures to an external caller: an error message is itself
-                // information about our state. Log locally, refuse uniformly.
-                Logger.error('Findings API request failed:', error);
-                response = createRefusal();
-            }
+            // Ответ откладывается до готовности: иначе запрос, разбудивший worker, получал бы отказ
+            // просто потому, что конфигурация ещё не прочитана (TASKS C6.1). Гейты findings-API от
+            // этого не меняются - решение по-прежнему принимает handleFindingsApiRequest.
+            this.whenReady().then(() => {
+                let response;
+                try {
+                    response = handleFindingsApiRequest(request, sender, {
+                        config: this.config,
+                        extensionVersion: chrome.runtime.getManifest().version,
+                        rateLimiter: this.findingsApiRateLimiter,
+                        now: Date.now(),
+                        getForegroundSnapshot: () => this.getForegroundFindingsSnapshot()
+                    });
+                } catch (error) {
+                    // Never surface internal failures to an external caller: an error message is itself
+                    // information about our state. Log locally, refuse uniformly.
+                    Logger.error('Findings API request failed:', error);
+                    response = createRefusal();
+                }
 
-            sendResponse(response);
-            return false;
+                sendResponse(response);
+            });
+            return true;
         });
     }
 
@@ -242,7 +271,8 @@ export class BackgroundManager {
     }
 
     setupEventListeners() {
-        chrome.runtime.onInstalled.addListener((details) => {
+        chrome.runtime.onInstalled.addListener(async (details) => {
+            await this.whenReady();
             if (details.reason === 'install') {
                 Logger.info('Extension installed');
                 this.showWelcomeNotification();
@@ -255,31 +285,37 @@ export class BackgroundManager {
 
         chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             if (changeInfo.status === 'complete' && tab.url) {
-                this.handleTabUpdated(tabId, tab).catch((error) => {
-                    Logger.error(`Failed to process tab update for ${tabId}:`, error);
-                });
+                this.whenReady()
+                    .then(() => this.handleTabUpdated(tabId, tab))
+                    .catch((error) => {
+                        Logger.error(`Failed to process tab update for ${tabId}:`, error);
+                    });
             }
         });
 
         chrome.tabs.onRemoved.addListener((tabId) => {
-            this.handleTabRemoved(tabId);
+            this.whenReady().then(() => this.handleTabRemoved(tabId));
         });
 
         chrome.tabs.onActivated.addListener((activeInfo) => {
-            this.handleTabActivated(activeInfo).catch((error) => {
-                Logger.error(`Failed to process tab activation for ${activeInfo.tabId}:`, error);
-            });
+            this.whenReady()
+                .then(() => this.handleTabActivated(activeInfo))
+                .catch((error) => {
+                    Logger.error(`Failed to process tab activation for ${activeInfo.tabId}:`, error);
+                });
         });
 
         chrome.windows.onFocusChanged.addListener((windowId) => {
-            this.handleWindowFocusChanged(windowId).catch((error) => {
-                Logger.error(`Failed to process window focus change for ${windowId}:`, error);
-            });
+            this.whenReady()
+                .then(() => this.handleWindowFocusChanged(windowId))
+                .catch((error) => {
+                    Logger.error(`Failed to process window focus change for ${windowId}:`, error);
+                });
         });
 
         chrome.webNavigation.onCommitted.addListener((details) => {
             if (details.frameId === 0) { // main frame only
-                this.handleNavigation(details.tabId, details.url);
+                this.whenReady().then(() => this.handleNavigation(details.tabId, details.url));
             }
         });
     }
@@ -291,9 +327,11 @@ export class BackgroundManager {
             const customPatternCatalogChanged = area === 'local'
                 && changes[CONFIG_STORAGE_KEYS.TRIGGER_PHRASES_CUSTOM_PATTERNS];
             if (generalConfigChanged || customPatternCatalogChanged) {
-                this.handleConfigChange().catch((error) => {
-                    Logger.error('Failed to refresh external configuration:', error);
-                });
+                this.whenReady()
+                    .then(() => this.handleConfigChange({ area }))
+                    .catch((error) => {
+                        Logger.error('Failed to refresh external configuration:', error);
+                    });
             }
         });
     }
@@ -392,11 +430,13 @@ export class BackgroundManager {
             return { success: false, stale: true, state: this.getApiPermissionState() };
         }
         const result = await this.apiPermissionCoordinator?.commitEnable(transactionId, granted);
+        await this.flushPendingApiPermissionReconcile();
         return result || { success: false, reason: 'permission-unavailable', state: this.getApiPermissionState() };
     }
 
     async handleApiPermissionDisable() {
         const result = await this.apiPermissionCoordinator?.disable();
+        await this.flushPendingApiPermissionReconcile();
         return result || { success: false, reason: 'permission-unavailable', state: this.getApiPermissionState() };
     }
 
@@ -446,10 +486,14 @@ export class BackgroundManager {
             if (!this.isForegroundTransitionCurrent(foregroundRevision)) {
                 return { success: false, skipped: 'stale-foreground' };
             }
+            // Вкладка могла исчезнуть, пока операция стояла в очереди (TASKS C6.7).
+            if (!Number.isInteger(tabId)) {
+                return { success: false, skipped: 'no-foreground-tab' };
+            }
 
             const enabledModules = this.getEnabledModulesForUrl(url);
 
-            const isForeground = tabId === this.foregroundTabId && this.config?.settings?.autoScan !== false;
+            const isForeground = this.isForegroundScanAllowed(tabId, url);
             this.syncApiObserverForForeground(foregroundRevision);
             const response = await chrome.tabs.sendMessage(tabId, {
                 action: 'setPageLifecycle',
@@ -502,11 +546,12 @@ export class BackgroundManager {
             this.activeTabs.set(tab.id, existing);
         }
 
+        // Дополнительно к общему правилу: только главный фрейм и только окно, которое сейчас в
+        // фокусе. Фрейм здесь спрашивает сам, поэтому проверка окна делается по его собственному
+        // windowId, а не по доверию к foregroundTabId.
         const isForeground = sender?.frameId === 0
-            && tab?.id === this.foregroundTabId
             && tab?.windowId === this.focusedWindowId
-            && this.isScannableUrl(tab?.url)
-            && this.config?.settings?.autoScan !== false;
+            && this.isForegroundScanAllowed(tab?.id, tab?.url);
 
         return {
             state: isForeground ? 'active' : 'paused',
@@ -654,6 +699,23 @@ export class BackgroundManager {
         return { success: true, tabId, windowId };
     }
 
+    // ЕДИНСТВЕННОЕ место, где написано «этой вкладке разрешено работать» (C2). Раньше правило было
+    // написано трижды разными руками и с разной строгостью: один из трёх вариантов не спрашивал про
+    // фокус окна вовсе, другой не спрашивал про сканируемость URL.
+    // Правило: работает только foreground-вкладка СФОКУСИРОВАННОГО окна. `tabs.Tab.active` для этого
+    // недостаточно - активная вкладка есть в КАЖДОМ окне, включая свёрнутые и фоновые, и ровно так
+    // и получается «скан всех вкладок»: 54 активные вкладки в разных окнах.
+    // Старт браузера, восстановление сессии и перезапуск service worker сюда не попадают вовсе:
+    // restoreActiveTabs() только регистрирует вкладки и рисует индикатор из кэша, а разрешение
+    // спрашивается один раз - для той вкладки, которую пользователь действительно смотрит.
+    isForegroundScanAllowed(tabId, url) {
+        return Number.isInteger(tabId)
+            && tabId === this.foregroundTabId
+            && this.focusedWindowId !== chrome.windows.WINDOW_ID_NONE
+            && this.isScannableUrl(url)
+            && this.config?.settings?.autoScan !== false;
+    }
+
     async sendPageLifecycle(
         tabId,
         state,
@@ -664,9 +726,7 @@ export class BackgroundManager {
         }
 
         const tabInfo = this.activeTabs.get(tabId);
-        const canActivate = state === 'active'
-            && this.isScannableUrl(tabInfo?.url)
-            && this.config?.settings?.autoScan !== false;
+        const canActivate = state === 'active' && this.isForegroundScanAllowed(tabId, tabInfo?.url);
         const modules = canActivate
             ? this.getEnabledModulesForUrl(tabInfo?.url)
             : [];
@@ -703,6 +763,12 @@ export class BackgroundManager {
         if (tabId === this.foregroundTabId) {
             this.invalidateApiObserver();
             this.foregroundTabId = null;
+            // Очередь foreground-переходов проверяет foregroundTabId при ПОСТАНОВКЕ, а операция
+            // перечитывает поле при ВЫПОЛНЕНИИ. Раньше закрытие вкладки обнуляло поле, не поднимая
+            // ревизию, поэтому уже стоявший в очереди переход доезжал до sendMessage(null, ...) и
+            // обычное закрытие вкладки давало Logger.error - шум, за которым хуже видно настоящие
+            // ошибки (TASKS C6.7). Поднятая ревизия делает такие переходы устаревшими.
+            this.foregroundTransitionRevision += 1;
         }
         this.schedulePageStatusCacheWrite();
 
@@ -769,10 +835,43 @@ export class BackgroundManager {
         this.applyIndicatorForTab(tabId);
     }
 
-    async handleScanPage(tabId) {
+    // Раньше handleScanPage не проверял ни foreground, ни владение вкладкой, а content.js при
+    // lifecycleState === 'paused' откатывается к configuredModuleNames и one-shot включает КАЖДЫЙ
+    // сконфигурированный детектор. То есть любой отправитель из контекста расширения мог заставить
+    // произвольную фоновую вкладку выполнить полную работу детекторов - в обход foreground-only
+    // контракта, который остальной файл выдерживает через foregroundTransitionRevision (TASKS C6.6).
+    // Разрешено ровно две цели: своя вкладка отправителя и активная вкладка сфокусированного окна.
+    async isScanTargetAllowed(tabId, sender) {
+        if (sender?.tab?.id === tabId) {
+            return true;
+        }
+        if (tabId === this.foregroundTabId) {
+            return true;
+        }
+        try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab?.active !== true) {
+                return false;
+            }
+            // getLastFocused, а не focusedWindowId: пока открыт popup, окно может считаться
+            // расфокусированным, и ручной скан по кнопке не должен от этого отказывать.
+            const lastFocusedWindow = await chrome.windows.getLastFocused();
+            return lastFocusedWindow?.id === tab.windowId;
+        } catch (error) {
+            Logger.debug(`Failed to verify scan target ${tabId}:`, error?.message || error);
+            return false;
+        }
+    }
+
+    async handleScanPage(tabId, sender = null) {
         try {
             if (!tabId) {
                 return { success: false, error: 'No active tab available for scan' };
+            }
+
+            if (!await this.isScanTargetAllowed(tabId, sender)) {
+                Logger.warn(`Scan refused for tab ${tabId}: not the sender tab and not the foreground tab`);
+                return { success: false, error: 'Scan target is neither the sender tab nor the foreground tab' };
             }
 
             const tabInfo = this.activeTabs.get(tabId);
@@ -849,6 +948,7 @@ export class BackgroundManager {
                 response?.results?.[PROMPT_SPLITTING_MODULE_ID]?.revision
                     ?? response?.results?.[PROMPT_SPLITTING_MODULE_ID]?.stats?.scanRevision
             ),
+            linkFindingsTruncated: response?.results?.[LINK_DOMAIN_SECURITY_MODULE_ID]?.findingsTruncated === true,
             promptSplittingFindingsTruncated: response?.results?.[PROMPT_SPLITTING_MODULE_ID]?.findingsTruncated === true,
             triggerFindings: this.normalizeTriggerFindings(
                 response?.results?.[TRIGGER_PHRASES_MODULE_ID]?.findings
@@ -938,6 +1038,7 @@ export class BackgroundManager {
                         visualFindings: this.normalizeVisualFindings(snapshot.visualFindings),
                         linkFindings: this.normalizeLinkFindings(snapshot.linkFindings),
                         linkRevision: this.normalizeRevision(snapshot.linkRevision),
+                        linkFindingsTruncated: snapshot.linkFindingsTruncated === true,
                         promptSplittingFindings: this.normalizePromptSplittingFindings(snapshot.promptSplittingFindings),
                         promptSplittingRevision: this.normalizeRevision(snapshot.promptSplittingRevision),
                         promptSplittingFindingsTruncated: snapshot.promptSplittingFindingsTruncated === true,
@@ -1000,12 +1101,17 @@ export class BackgroundManager {
                         : [],
                     linkFindings: this.normalizeLinkFindings(snapshot.linkFindings),
                     linkRevision: this.normalizeRevision(snapshot.linkRevision),
+                    linkFindingsTruncated: snapshot.linkFindingsTruncated === true,
                     promptSplittingFindings: this.normalizePromptSplittingFindings(snapshot.promptSplittingFindings),
                     promptSplittingRevision: this.normalizeRevision(snapshot.promptSplittingRevision),
                     promptSplittingFindingsTruncated: snapshot.promptSplittingFindingsTruncated === true,
                     triggerFindings: this.normalizeTriggerFindings(snapshot.triggerFindings),
                     triggerRevision: this.normalizeRevision(snapshot.triggerRevision),
                     partialModules: this.normalizePartialModules(snapshot.partialModules),
+                    // Перезапуск service worker не должен превращать «страница снимала наши метки»
+                    // и «эту вкладку смотрит автоматизированный браузер» в отсутствие сигнала.
+                    context: this.normalizePageContext(snapshot.context),
+                    intervention: this.normalizeInterventionReport(snapshot.intervention),
                     totalFindings: Number.isFinite(snapshot.totalFindings)
                         ? Math.max(0, Math.trunc(snapshot.totalFindings))
                         : 0,
@@ -1025,6 +1131,52 @@ export class BackgroundManager {
         } catch (error) {
             Logger.warn('Failed to persist page status session cache:', error);
         }
+    }
+
+    // C4: контекст страницы приходит из content-скрипта, то есть из контекста страницы, и
+    // нормализуется так же строго, как всё остальное оттуда: три известных поля, флаг и два числа.
+    normalizePageContext(context) {
+        if (!context || typeof context !== 'object') {
+            return null;
+        }
+        const count = (value) => (Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0);
+        return {
+            automation: context.automation === true,
+            longTasksObserved: count(context.longTasksObserved),
+            sliceBackoffSteps: count(context.sliceBackoffSteps),
+            framesPresent: Math.min(count(context.framesPresent), 100),
+            framesAnalyzed: Math.min(count(context.framesAnalyzed), 100),
+            scanBudgetExhausted: context.scanBudgetExhausted === true,
+            lastScanActiveMs: Number.isFinite(context.lastScanActiveMs)
+                ? Math.max(0, Math.round(context.lastScanActiveMs * 100) / 100)
+                : 0
+        };
+    }
+
+    // C4.4: отчёт слоя вмешательства приходит из content-скрипта, то есть из контекста страницы, -
+    // поэтому нормализуется так же строго, как находки: только known-поля, только числа и наш
+    // собственный словарь типов находок. Ни узлов, ни текста страницы здесь быть не может.
+    normalizeInterventionReport(report) {
+        if (!report || typeof report !== 'object') {
+            return null;
+        }
+        const count = (value) => (Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0);
+        return {
+            enabled: report.enabled === true,
+            action: ['annotate', 'reveal', 'neutralize'].includes(report.action) ? report.action : 'annotate',
+            appliedEdits: count(report.appliedEdits),
+            annotationsApplied: count(report.annotationsApplied),
+            revealsApplied: count(report.revealsApplied),
+            neutralizationsApplied: count(report.neutralizationsApplied),
+            tamperedEdits: count(report.tamperedEdits),
+            tamperedFindingTypes: Array.isArray(report.tamperedFindingTypes)
+                ? report.tamperedFindingTypes
+                    .filter((type) => typeof type === 'string')
+                    .slice(0, 8)
+                    .map((type) => type.slice(0, 96))
+                : [],
+            intentionsDropped: count(report.intentionsDropped)
+        };
     }
 
     handlePageStatusUpdate(data, sender) {
@@ -1075,6 +1227,7 @@ export class BackgroundManager {
         const linkRevision = this.normalizeRevision(data?.linkRevision);
         const promptSplittingFindings = this.normalizePromptSplittingFindings(data?.promptSplittingFindings);
         const promptSplittingRevision = this.normalizeRevision(data?.promptSplittingRevision);
+        const linkFindingsTruncated = data?.linkFindingsTruncated === true;
         const promptSplittingFindingsTruncated = data?.promptSplittingFindingsTruncated === true;
         const triggerFindings = this.normalizeTriggerFindings(data?.triggerFindings);
         const triggerRevision = this.normalizeRevision(data?.triggerRevision);
@@ -1088,12 +1241,15 @@ export class BackgroundManager {
             visualFindings,
             linkFindings,
             linkRevision,
+            linkFindingsTruncated,
             promptSplittingFindings,
             promptSplittingRevision,
             promptSplittingFindingsTruncated,
             triggerFindings,
             triggerRevision,
             partialModules,
+            context: this.normalizePageContext(data?.context),
+            intervention: this.normalizeInterventionReport(data?.intervention),
             totalFindings: payloadTotal,
             status: payloadTotal > 0 ? 'issues' : 'clean',
             timestamp: Number.isFinite(data?.timestamp) ? data.timestamp : Date.now()
@@ -1331,8 +1487,13 @@ export class BackgroundManager {
             && moduleConfig.enabled === true
             && moduleConfig.monitorOnly === true
             && this.getApiPermissionState().capability === 'granted';
+        // Без идентичности навигации сигнатура не менялась при переходе в той же вкладке, и
+        // syncApiObserverForForeground выходил раньше apiFindingState.reset(): кандидат со страницы A
+        // продолжал отдаваться в снапшоте уже на странице B, вопреки контракту «снапшоты кэшируются
+        // по tab/frame + идентичность навигации» (TASKS 13.4). Выбран модуль-локальный вариант:
+        // инвалидация в handleTabUpdated задела бы общий lifecycle-путь, а не только этот модуль.
         const signature = canObserve
-            ? `${this.foregroundTabId}:${foregroundRevision}:enabled`
+            ? `${this.foregroundTabId}:${foregroundRevision}:${this.getCacheUrlIdentity(tabInfo?.url)}:enabled`
             : 'inactive';
         if (signature === this.apiObserverSignature) {
             return;
@@ -1360,7 +1521,7 @@ export class BackgroundManager {
         }
         chrome.permissions.onAdded.addListener((change) => {
             if (isApiPermissionDescriptorRelevant(change)) {
-                this.apiPermissionCoordinator?.reconcile().catch(() => {});
+                this.reconcileApiPermissionWhenIdle();
             }
         });
         chrome.permissions.onRemoved.addListener((change) => {
@@ -1368,8 +1529,35 @@ export class BackgroundManager {
                 return;
             }
             this.invalidateApiObserver();
-            this.apiPermissionCoordinator?.reconcile().catch(() => {});
+            this.reconcileApiPermissionWhenIdle();
         });
+    }
+
+    // Chrome поднимает permissions.onAdded РАНЬШЕ, чем до нас доходит apiPermissionCommit. Слушатель
+    // звал reconcile(), первый оператор которого - ++revision, поэтому: (а) транзакция включения
+    // становилась устаревшей и commitDesiredEnabled(true) не выполнялся, (б) тот же reconcile видел
+    // desiredEnabled === false (commit-то не отработал) при capability === 'granted' и немедленно
+    // вызывал permissions.remove() - каждая попытка включения выдавала разрешение и тут же сама его
+    // отзывала. Тем же механизмом disable() рапортовал stale на фактически успешном отключении и
+    // пользователь видел ошибку вместо успеха (TASKS 13.1 и 13.3).
+    // Гейт по образцу handleConfigChange, но событие НЕ отбрасывается: reconcile откладывается до
+    // конца транзакции, иначе гейт превратился бы в игнорирование настоящего внешнего отзыва
+    // разрешения.
+    reconcileApiPermissionWhenIdle() {
+        if (this.getApiPermissionState().transaction !== 'idle') {
+            this.apiPermissionReconcilePending = true;
+            return Promise.resolve();
+        }
+        this.apiPermissionReconcilePending = false;
+        return (this.apiPermissionCoordinator?.reconcile() || Promise.resolve()).catch(() => {});
+    }
+
+    // Вызывается после завершения транзакции: отложенное событие обязано доехать.
+    flushPendingApiPermissionReconcile() {
+        if (!this.apiPermissionReconcilePending) {
+            return Promise.resolve();
+        }
+        return this.reconcileApiPermissionWhenIdle();
     }
 
     invalidateApiObserver() {
@@ -1404,10 +1592,58 @@ export class BackgroundManager {
         return { success: true, action: actionName };
     }
 
-    async handleConfigChange() {
-        Logger.info('Configuration changed externally');
+    // Одно сохранение конфигурации поднимает storage.onChanged дважды (ключ пишется и в sync, и в
+    // local), а одно переключение модуля в popup сохраняется ещё и в самом popup - до четырёх
+    // событий на одно нажатие, и раньше каждое из них шло в полное переприменение по ВСЕМ вкладкам
+    // (сброс page status и очистка бейджа на каждой). Стоимость умножалась и на число вкладок, и на
+    // четыре - при том, что проект уже имел инцидент с фризом на 54 вкладках (TASKS C6.5).
+    // События схлопываются: пока обработка идёт, новые лишь поднимают флаг, и после неё выполняется
+    // ровно один догоняющий проход.
+    handleConfigChange({ area } = {}) {
+        if (area === 'sync') {
+            this.foreignSyncChangeSeen = true;
+        }
+        this.configChangePending = true;
+
+        if (this.configChangeInFlight) {
+            return this.configChangeInFlight;
+        }
+
+        this.configChangeInFlight = (async () => {
+            try {
+                while (this.configChangePending) {
+                    this.configChangePending = false;
+                    await this.applyConfigChange();
+                }
+            } finally {
+                this.configChangeInFlight = null;
+            }
+        })();
+
+        return this.configChangeInFlight;
+    }
+
+    async applyConfigChange() {
+        // Появление ЧУЖОГО значения в sync снимает признак «авторитетен local»: без этого один
+        // отказ записи в sync навсегда отрезал бы устройство от синхронизации (TASKS C6.3).
+        // Признак «чужое» здесь консервативный: если своей отложенной записи нет, значение в sync
+        // не старше нашего. Конфликт двух устройств MVP разрешает как «последний писавший в sync
+        // выигрывает».
+        if (this.foreignSyncChangeSeen && ConfigManager.pendingSyncConfig === null) {
+            this.foreignSyncChangeSeen = false;
+            await ConfigManager.releaseLocalAuthoritative();
+        }
+
         const oldConfig = this.config;
         this.config = await ConfigManager.refreshConfig();
+
+        // Второй рубеж того же контракта: событие, не несущее изменения содержимого, дальше не идёт.
+        if (JSON.stringify(oldConfig) === JSON.stringify(this.config)) {
+            Logger.debug('Configuration event carried no change - reapply skipped');
+            return;
+        }
+
+        Logger.info('Configuration changed externally');
         await this.applyConfigToAllTabs(oldConfig, this.config);
         if (this.getApiPermissionState().transaction === 'idle') {
             await this.apiPermissionCoordinator?.reconcile();

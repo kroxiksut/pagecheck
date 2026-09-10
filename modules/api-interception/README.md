@@ -54,7 +54,6 @@ The observer exports only a bounded revision, status, aggregate counters, overfl
 
 - `enabled`
 - `monitorOnly` — must be `true` for the observer to activate.
-- `allowIntervention` — ignored by Priority 2; this stage never modifies traffic.
 
 ## Validation
 

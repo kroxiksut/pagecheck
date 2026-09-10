@@ -101,7 +101,15 @@ export const ThemeManager = {
         this.updateBodyClasses(themeName);
     },
 
-    // Загрузка auto-темы
+    // Загрузка auto-темы.
+    // ВАЖНО (TASKS C6.9): updateBodyClasses('auto') здесь НЕ мёртвый вызов, хотя loadSpecificTheme
+    // ниже и заменяет класс на light/dark. Он ставит промежуточную палитру на время загрузки файла
+    // темы: таблица стилей уже очищена, и без класса 'auto' страница осталась бы с палитрой
+    // ПРЕДЫДУЩЕЙ темы - при переключении dark -> auto это видимая вспышка. Правила
+    // body.pagecheck-theme-auto в styles/options.css и styles/popup.css обслуживают ровно это окно,
+    // а также аварийный путь loadFallbackTheme(), который оставляет класс 'auto' и пустую таблицу
+    // стилей насовсем. То есть они достижимы, и удалять их нельзя.
+    // Живую смену системной темы обслуживает setupSystemThemeListener, а не media-запрос в CSS.
     async loadAutoTheme() {
         const systemTheme = this.getSystemTheme();
         this.styleElement.textContent = '';

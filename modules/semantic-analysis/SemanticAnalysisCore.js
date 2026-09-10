@@ -15,6 +15,9 @@ const WORD_CHARACTER_PATTERN = /[\p{L}\p{M}\p{N}\p{Pc}]/u;
 const TOKEN_PATTERN = /[\p{L}\p{M}\p{N}]+/gu;
 const EXTENDED_PICTOGRAPHIC_PATTERN = /\p{Extended_Pictographic}/u;
 const LITERAL_EXACT_CHARACTER_PATTERN = /[*+?()[\]{}|\\^$\/]/u;
+// @data-list Диапазоны письменностей Unicode для определения языка сегмента. Устаревание =
+// ТИШИНА: текст на неучтённой письменности не сопоставится ни с одним правилом каталога.
+// Сверяться с блоками Unicode при добавлении новых языков в каталог.
 const SCRIPT_PATTERNS = [
     /\p{Script_Extensions=Latin}/u, /\p{Script_Extensions=Cyrillic}/u,
     /\p{Script_Extensions=Greek}/u, /\p{Script_Extensions=Armenian}/u,
@@ -24,6 +27,9 @@ const SCRIPT_PATTERNS = [
     /\p{Script_Extensions=Hiragana}/u, /\p{Script_Extensions=Katakana}/u,
     /\p{Script_Extensions=Hangul}/u
 ];
+// @data-list Допустимые категории правил каталога - контракт валидации, а не данные о мире.
+// Устаревание = ОТКАЗ ВАЛИДАЦИИ: правило новой категории будет отвергнуто на входе, громко.
+// Этот список меняется вместе с каталогом и в предрелизной ревизии не нуждается.
 const SEMANTIC_CATEGORIES = new Set([
     'instruction-override', 'authority-impersonation', 'role-manipulation', 'sensitive-disclosure',
     'safety-bypass', 'hidden-action', 'coercion', 'agent-directed-action'
@@ -79,6 +85,22 @@ function getSemanticRuleValidationError(rule, ruleIds) {
     return null;
 }
 
+// Валидатор считает optionalSignals/forbiddenSignals необязательными (нормализует их в локальные
+// переменные), а классификатор обращался к rule.forbiddenSignals.some(...) напрямую. Правило без
+// этих полей проходило валидацию с рапортом об успехе и роняло classifyNormalizedSegment на
+// TypeError, который голый catch в analyzeSemanticCandidate превращал в status: 'error' с нулём
+// находок - полная потеря детекта СРАЗУ у обоих потребителей и без единого признака (TASKS 1.1).
+// Выбран вариант «нормализовать при сборке»: каталог остаётся данными без обязательного
+// боилерплейта, а классификатор получает гарантированную форму.
+function normalizeSemanticRule(rule) {
+    return {
+        ...rule,
+        requiredSignals: Array.isArray(rule.requiredSignals) ? rule.requiredSignals : [],
+        optionalSignals: Array.isArray(rule.optionalSignals) ? rule.optionalSignals : [],
+        forbiddenSignals: Array.isArray(rule.forbiddenSignals) ? rule.forbiddenSignals : []
+    };
+}
+
 function collectCatalogValidation(catalog) {
     if (!Array.isArray(catalog)) {
         return {
@@ -96,7 +118,7 @@ function collectCatalogValidation(catalog) {
     for (const rule of catalog) {
         const errorCode = getSemanticRuleValidationError(rule, ruleIds);
         if (!errorCode) {
-            validRules.push(rule);
+            validRules.push(normalizeSemanticRule(rule));
             continue;
         }
         if (invalidRules.length < 32) {
@@ -167,6 +189,9 @@ function getCodePointAt(text, index) {
     return Number.isInteger(codePoint) ? String.fromCodePoint(codePoint) : '';
 }
 
+// Возобновление с matchIndex + 1, а не + phrase.length: раньше отказ по границе слова выбрасывал
+// вместе с отвергнутым вхождением и все вхождения, начинающиеся ВНУТРИ него. Самоперекрывающийся
+// пользовательский литерал ("foo bar foo") обходился приписыванием одной буквы спереди (TASKS 1.4).
 function matchesNormalizedPhrase(comparisonText, phrase) {
     let matchIndex = comparisonText.indexOf(phrase);
     while (matchIndex >= 0) {
@@ -174,7 +199,7 @@ function matchesNormalizedPhrase(comparisonText, phrase) {
             && !isWordCharacter(getCodePointAt(comparisonText, matchIndex + phrase.length))) {
             return true;
         }
-        matchIndex = comparisonText.indexOf(phrase, matchIndex + phrase.length);
+        matchIndex = comparisonText.indexOf(phrase, matchIndex + 1);
     }
     return false;
 }
@@ -185,7 +210,15 @@ function getUnicodeTokenRecords(text) {
             ? { token: segment, start: index, end: index + segment.length }
             : null).filter(Boolean);
     }
-    return Array.from(text.matchAll(TOKEN_PATTERN), ([token, index]) => ({ token, start: index, end: index + token.length }));
+    // Раньше здесь была деструктуризация ([token, index]): index брался как группа 1, которой в
+    // паттерне нет, поэтому start был undefined, а end - NaN. Ветка работает только там, где нет
+    // Intl.Segmenter, и потому дефект годами не был виден; при этом мусорные диапазоны доезжали до
+    // PromptDecisionEngine.mapContributions (TASKS 1.6).
+    return Array.from(text.matchAll(TOKEN_PATTERN), (match) => ({
+        token: match[0],
+        start: match.index,
+        end: match.index + match[0].length
+    }));
 }
 
 function getUnicodeTokens(text) {
@@ -214,7 +247,8 @@ function findNormalizedPhraseRange(comparisonText, phrase, tokenRecords) {
                 return { startTokenIndex, endTokenIndex };
             }
         }
-        matchIndex = comparisonText.indexOf(phrase, matchIndex + phrase.length);
+        // См. matchesNormalizedPhrase: тот же дефект пропуска вложенных вхождений (TASKS 1.4).
+        matchIndex = comparisonText.indexOf(phrase, matchIndex + 1);
     }
     return null;
 }
@@ -230,7 +264,13 @@ function hasMixedScripts(text) {
 }
 
 function normalizeSegment(candidate, caseSensitive) {
-    const whitespaceCollapsedText = candidate.text.replace(WHITESPACE_PATTERN, ' ').trim();
+    // U+FEFF попадает под \s, поэтому схлопывание пробелов переписывало его в пробел ДО расчёта
+    // флагов: "Ig\uFEFFnore ..." давал invisibleCharactersPresent: false, тогда как эквивалентный
+    // U+200B ставил флаг. Совпадения не было ни там, ни там, но вместе с совпадением пропадал и
+    // запасной сигнал обфускации, на который мог бы опереться вызывающий - обход стоил один символ
+    // (TASKS 1.3). Признаки невидимых/bidi/join-символов считаются по исходному тексту кандидата.
+    const sourceText = candidate.text;
+    const whitespaceCollapsedText = sourceText.replace(WHITESPACE_PATTERN, ' ').trim();
     const canonicalText = whitespaceCollapsedText.normalize('NFC');
     const compatibilityText = canonicalText.normalize('NFKC');
     const comparisonText = caseSensitive ? compatibilityText : compatibilityText.toLowerCase();
@@ -241,17 +281,28 @@ function normalizeSegment(candidate, caseSensitive) {
     const normalizationFlags = {
         whitespaceCollapsed: whitespaceCollapsedText !== candidate.text,
         compatibilityChanged: compatibilityText !== canonicalText,
-        invisibleCharactersPresent: INVISIBLE_CHARACTER_TEST_PATTERN.test(canonicalText),
-        bidiControlsPresent: BIDI_CONTROL_TEST_PATTERN.test(canonicalText),
-        joinControlsPresent: JOIN_CONTROL_TEST_PATTERN.test(canonicalText),
+        invisibleCharactersPresent: INVISIBLE_CHARACTER_TEST_PATTERN.test(sourceText),
+        bidiControlsPresent: BIDI_CONTROL_TEST_PATTERN.test(sourceText),
+        joinControlsPresent: JOIN_CONTROL_TEST_PATTERN.test(sourceText),
         mixedScriptsPresent: hasMixedScripts(canonicalText),
         longCandidateSegmented: candidate.longCandidateSegmented === true,
-        deobfuscatedTextChanged: comparisonText
+        deobfuscatedTextChanged: sourceText
             .replace(INVISIBLE_CHARACTER_PATTERN, '')
             .replace(BIDI_CONTROL_PATTERN, '')
-            .replace(JOIN_CONTROL_PATTERN, '') !== comparisonText
+            .replace(JOIN_CONTROL_PATTERN, '') !== sourceText
     };
-    const contributionMappingReliable = !normalizationFlags.compatibilityChanged
+    // Вторая половина направления 1.6: сам флаг не должен считаться истинным при невалидных
+    // диапазонах. Раньше он сравнивал только текст и количество токенов, поэтому мусорные
+    // start/end (fallback-ветка без Intl.Segmenter читала группу захвата вместо индекса) доезжали
+    // до PromptDecisionEngine.mapContributions с mappingReliable: true. Сами диапазоны исправлены,
+    // это рубеж на случай третьего пути токенизации.
+    const sourceTokenRangesValid = sourceTokenRecords.every((record) => Number.isInteger(record.start)
+        && Number.isInteger(record.end)
+        && record.start >= 0
+        && record.end > record.start
+        && record.end <= sourceText.length);
+    const contributionMappingReliable = sourceTokenRangesValid
+        && !normalizationFlags.compatibilityChanged
         && !normalizationFlags.invisibleCharactersPresent
         && !normalizationFlags.bidiControlsPresent
         && !normalizationFlags.joinControlsPresent
@@ -275,9 +326,19 @@ function classifyNormalizedSegment(segment) {
     const comparisonText = segment.tokens.join(' ');
     if (!comparisonText) return [];
     return ACTIVE_SEMANTIC_RULES.reduce((matches, rule) => {
-        const findSignalMatch = (signal) => signal.alternatives
-            .map((phrase) => findNormalizedPhraseRange(comparisonText, phrase, segment.comparisonTokenRecords))
-            .find(Boolean);
+        // Раньше .map(...).find(Boolean) прогонял findNormalizedPhraseRange по ВСЕМ альтернативам
+        // и только потом брал первую результативную: для sensitive-disclosure это 6 + 10 полных
+        // проходов по тексту сравнения на сегмент там, где хватает 1 + 1 (TASKS 1.9). Порядок
+        // выбора альтернативы прежний, поэтому результат не меняется.
+        const findSignalMatch = (signal) => {
+            for (const phrase of signal.alternatives) {
+                const range = findNormalizedPhraseRange(comparisonText, phrase, segment.comparisonTokenRecords);
+                if (range) {
+                    return range;
+                }
+            }
+            return null;
+        };
         if (rule.forbiddenSignals.some((signal) => findSignalMatch(signal))) return matches;
         const requiredSignalMatches = rule.requiredSignals.map((signal) => ({ signalId: signal.id, range: findSignalMatch(signal) }));
         if (requiredSignalMatches.some((entry) => !entry.range)) return matches;
@@ -387,31 +448,49 @@ function evaluateSemanticMatches(matches, segment, sensitivity, includeTransient
         const relatedActionGroup = match.relatedActionGroups?.length === 1 ? match.relatedActionGroups[0] : null;
         addToGroup(relatedActionGroup && groups.has(relatedActionGroup) ? relatedActionGroup : match.actionGroup, match);
     });
+    // Непервичные совпадения без supportsPrimaryActionGroups (оба role-manipulation.*) раньше
+    // отбрасывались, как только находилось хоть одно первичное: они не попадали ни в группу, ни в
+    // контекстную поддержку. Из-за этого ВТОРОЙ признак атаки делал отчёт беднее, чем каждый признак
+    // по отдельности (TASKS 1.5). Решение по развилке: такая поддержка идёт ТОЛЬКО в диагностику -
+    // она не влияет ни на evidenceStrength, ни на impact, ни на severity, ни на идентичность
+    // finding (та строится по actionGroup), поэтому пороги и переходы не меняются.
     const contextualSupportingMatches = uniqueMatches.filter((match) => !match.primary && match.supportsPrimaryActionGroups);
+    const residualSupportingMatches = uniqueMatches.filter((match) => !match.primary && !match.supportsPrimaryActionGroups);
     return [...groups.values()].map((groupMatches) => {
         const primaryMatch = groupMatches.find((match) => match.category !== 'custom-pattern') || groupMatches[0];
         const supportingMatches = groupMatches.filter((match) => match !== primaryMatch)
-            .concat(primaryMatch.category === 'custom-pattern' ? [] : contextualSupportingMatches);
+            .concat(primaryMatch.category === 'custom-pattern' ? [] : [...contextualSupportingMatches, ...residualSupportingMatches]);
         return evaluateSemanticMatch(primaryMatch, segment, sensitivity, supportingMatches, includeTransientContributionMap);
     });
 }
 
 export function prepareCustomLiteralCatalog(catalog, config = {}, limits = {}) {
     if (catalog?.version !== 1 || !Array.isArray(catalog.items)) return [];
-    const maxPatterns = Number.isInteger(limits.maxPatterns) ? Math.max(0, limits.maxPatterns) : 500;
-    const maxCharacters = Number.isInteger(limits.maxCharacters) ? Math.max(0, limits.maxCharacters) : 65536;
+    // Раньше здесь стояли литералы 500 и 65536 - второй источник правды для тех же лимитов.
+    const maxPatterns = Number.isInteger(limits.maxPatterns)
+        ? Math.max(0, limits.maxPatterns)
+        : DEFAULT_MAX_CUSTOM_LITERAL_PATTERNS;
+    const maxCharacters = Number.isInteger(limits.maxCharacters)
+        ? Math.max(0, limits.maxCharacters)
+        : DEFAULT_MAX_CANDIDATE_CHARACTERS;
     const caseSensitive = config.caseSensitive === true;
     const seenPatterns = new Set();
     const activePatterns = [];
     let totalPatternCharacters = 0;
     for (const item of catalog.items) {
+        // Исчерпанный бюджет обрывает цикл, а не продолжает его: раньше после исчерпания лимита
+        // normalizeSegment (NFC + NFKC + Intl.Segmenter + getRelatedActionGroupsForLiteral по всем
+        // правилам) отрабатывал впустую для каждого оставшегося элемента - и так на каждом
+        // обновлении конфигурации (TASKS 1.10). Обе проверки точные: лишний паттерн уже не влезет
+        // по числу, а любой непустой паттерн стоит не меньше одного символа.
+        if (activePatterns.length >= maxPatterns || totalPatternCharacters >= maxCharacters) break;
         if (!item?.enabled || item.mode !== 'literal' || typeof item.id !== 'string' || typeof item.source !== 'string') continue;
         const normalized = normalizeSegment({ text: item.source, sourceType: 'custom-pattern', context: {}, segmentIndex: 0 }, caseSensitive);
         const requiresExactComparison = EXTENDED_PICTOGRAPHIC_PATTERN.test(normalized.comparisonText)
             || normalized.normalizationFlags.joinControlsPresent || LITERAL_EXACT_CHARACTER_PATTERN.test(normalized.comparisonText);
         const comparisonText = requiresExactComparison ? normalized.comparisonText : normalized.tokens.join(' ');
         const patternCharacterCount = countCodePoints(comparisonText);
-        if (!comparisonText || activePatterns.length >= maxPatterns || totalPatternCharacters + patternCharacterCount > maxCharacters) continue;
+        if (!comparisonText || totalPatternCharacters + patternCharacterCount > maxCharacters) continue;
         const dedupeKey = `${requiresExactComparison}:${comparisonText}`;
         if (seenPatterns.has(dedupeKey)) continue;
         seenPatterns.add(dedupeKey);
@@ -484,6 +563,7 @@ export function analyzeSemanticCandidate(candidate, options = {}) {
         const maxCustomLiteralPatterns = Number.isInteger(options.maxCustomLiteralPatterns)
             ? Math.max(0, options.maxCustomLiteralPatterns)
             : DEFAULT_MAX_CUSTOM_LITERAL_PATTERNS;
+        const maxCustomMatches = Math.max(0, options.maxCustomMatches ?? 10);
         const customPatternLimit = Math.min(customLiteralCatalog.length, maxCustomLiteralPatterns);
         let partial = customLiteralCatalog.length > customPatternLimit;
         const tokenText = segment.tokens.join(' ');
@@ -496,6 +576,14 @@ export function analyzeSemanticCandidate(candidate, options = {}) {
             customLiteralComparisons += 1;
             const candidateText = pattern.requiresExactComparison ? segment.comparisonText : tokenText;
             if (!candidateText || !matchesNormalizedPhrase(candidateText, pattern.comparisonText)) continue;
+            // Лимит проверяется ДО push (раньше maxCustomMatches: 0 всё равно давал одно совпадение)
+            // и помечает результат частичным - как это делают соседние пути shouldStop и
+            // maxCustomLiteralPatterns. Без этого TriggerPhrases и PromptDecisionEngine считали
+            // усечённый скан исчерпывающим (TASKS 1.7, семантика partial - C5.2 корневого TASKS).
+            if (customMatches.length >= maxCustomMatches) {
+                partial = true;
+                break;
+            }
             customMatches.push({
                 ruleId: `custom-pattern:${pattern.id}`, category: 'custom-pattern', subtype: 'literal', actionGroup: `custom-pattern:${pattern.id}`,
                 relatedActionGroups: pattern.relatedActionGroups, language: 'user', baseSignalStrength: pattern.shortPattern ? 'weak' : 'strong',
@@ -503,7 +591,6 @@ export function analyzeSemanticCandidate(candidate, options = {}) {
                 contributingSignals: ['literal-match'], supportingSignals: [], context: segment.context,
                 reasonKey: 'findingTriggerPhraseSummary', ruleVersion: 1
             });
-            if (customMatches.length >= Math.max(0, options.maxCustomMatches ?? 10)) break;
         }
         const ruleMatchingMs = Math.max(0, performance.now() - matchingStartedAt);
         const riskEvaluationStartedAt = performance.now();
@@ -525,7 +612,20 @@ export function analyzeSemanticCandidate(candidate, options = {}) {
                 normalizationMs, ruleMatchingMs, riskEvaluationMs
             }
         };
-    } catch {
-        return { schemaVersion: SEMANTIC_ANALYSIS_SCHEMA_VERSION, status: 'error', assessments: [], diagnostics: { normalizedCharacters: 0, semanticMatches: 0, customMatches: 0, customLiteralComparisons: 0, normalizationMs: 0, ruleMatchingMs: 0, riskEvaluationMs: 0 } };
+    } catch (error) {
+        // Голый catch делал поломку инфраструктуры неотличимой от «текст не подошёл»: и то и другое
+        // выглядело как ноль находок. Диагностика теперь несёт признак отказа и ИМЯ класса ошибки -
+        // без сообщения, чтобы в диагностику не утёк текст страницы (TASKS 1.1).
+        return {
+            schemaVersion: SEMANTIC_ANALYSIS_SCHEMA_VERSION,
+            status: 'error',
+            assessments: [],
+            diagnostics: {
+                normalizedCharacters: 0, semanticMatches: 0, customMatches: 0, customLiteralComparisons: 0,
+                analysisFailed: true,
+                failureName: typeof error?.name === 'string' && error.name !== '' ? error.name : 'Error',
+                normalizationMs: 0, ruleMatchingMs: 0, riskEvaluationMs: 0
+            }
+        };
     }
 }

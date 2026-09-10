@@ -36,6 +36,8 @@ export default class ApiFindingState {
         this.navigationRevision = null;
         this.revision = 0;
         this.partial = false;
+        // Батчи, отброшенные как устаревшие, считаются: раньше потеря была молчаливой (TASKS 13.5).
+        this.staleBatchesDropped = 0;
     }
 
     applyDecisions(decisions, context) {
@@ -46,7 +48,18 @@ export default class ApiFindingState {
         if (this.navigationRevision === null) {
             this.navigationRevision = navigationRevision;
         }
-        if (this.navigationRevision !== navigationRevision) {
+        if (navigationRevision > this.navigationRevision) {
+            // Более новая ревизия навигации ПЕРЕКАТЫВАЕТ состояние, а не игнорируется: раньше такой
+            // батч терялся навсегда - без счётчика и без флага, - и вместе с пропущенным сбросом
+            // (13.4) это давало тихую потерю новых данных, а не только устаревшие старые
+            // (TASKS 13.5).
+            this.activeByCategory = new Map();
+            this.navigationRevision = navigationRevision;
+            this.partial = false;
+            this.revision += 1;
+        } else if (navigationRevision < this.navigationRevision) {
+            // Батч более старой навигации применять нельзя, но и молчать о нём нельзя.
+            this.staleBatchesDropped += 1;
             return this.getCandidateSnapshot();
         }
 

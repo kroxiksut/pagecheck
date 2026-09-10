@@ -133,11 +133,29 @@ export function scanHiddenInputs({ element, style, module }) {
         );
     }
 
+    // A zero-sized ANCESTOR hides a descendant only when it actually clips it. Without that
+    // condition the walk matched the common anchor/measurement pattern - `position: relative;
+    // width: 0; height: 0` wrapping an absolutely positioned, fully visible control - and reported
+    // it as a hidden input (TASKS 8.11). The element's own zero size still counts unconditionally.
+    // Note the sanity check below is deliberately left as it is: an ancestor-hidden control has a
+    // perfectly normal rect of its own, so running module.isInputHidden() on it would discard every
+    // ancestor attribution, not just the wrong ones.
     applyHidingSource(
         'zero-size',
-        (node) => {
+        (node, isSelf) => {
             const rect = module.getRect(node);
-            return (rect.width <= 1 || rect.height <= 1) ? { matched: true } : null;
+            if (rect.width > 1 && rect.height > 1) {
+                return null;
+            }
+            if (isSelf) {
+                return { matched: true };
+            }
+
+            const nodeStyle = module.getComputedStyle(node);
+            const clipsOverflow = ['hidden', 'clip'].includes(nodeStyle.overflow)
+                || ['hidden', 'clip'].includes(nodeStyle.overflowX)
+                || ['hidden', 'clip'].includes(nodeStyle.overflowY);
+            return clipsOverflow ? { matched: true } : null;
         },
         'geometry'
     );
@@ -224,26 +242,32 @@ export function scanHiddenInputs({ element, style, module }) {
 
     const isChecked = isConsentControl && (element.checked || element.hasAttribute('checked'));
     const isRequired = element.hasAttribute('required') || element.getAttribute('aria-required') === 'true';
-    const labelsText = Array.from(element.labels || [])
-        .map((label) => label?.textContent || '')
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLowerCase();
-    const nearbyRawText = [
-        element.getAttribute('aria-label') || '',
-        element.getAttribute('title') || '',
-        labelsText,
-        element.parentElement?.textContent || '',
-        element.closest('label')?.textContent || '',
-        element.closest('form')?.textContent || ''
-    ].join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
-
     const consentKeywords = [
         'consent', 'agree', 'agreement', 'terms', 'policy', 'privacy', 'marketing', 'newsletter', 'subscribe', 'opt-in',
         'соглас', 'оферт', 'правил', 'политик', 'подпис', 'маркет', 'персональн', 'рассыл'
     ];
-    const hasConsentNearbyText = isConsentControl && consentKeywords.some((keyword) => nearbyRawText.includes(keyword));
+
+    // The nearby-text probe pulls in the text of the whole enclosing form, so it lives inside the
+    // consent gate that is its only consumer - it used to run for every hidden control and be
+    // thrown away for all of them except checkboxes and radios (TASKS 8.6).
+    let hasConsentNearbyText = false;
+    if (isConsentControl) {
+        const labelsText = Array.from(element.labels || [])
+            .map((label) => label?.textContent || '')
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+        const nearbyRawText = [
+            element.getAttribute('aria-label') || '',
+            element.getAttribute('title') || '',
+            labelsText,
+            element.parentElement?.textContent || '',
+            element.closest('label')?.textContent || '',
+            element.closest('form')?.textContent || ''
+        ].join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
+        hasConsentNearbyText = consentKeywords.some((keyword) => nearbyRawText.includes(keyword));
+    }
 
     const consentSignals = [];
     if (isChecked) {
@@ -333,7 +357,11 @@ export function scanHiddenInputs({ element, style, module }) {
             uploadSignals.push('visible-button-trigger');
         }
 
-        const ariaControls = nearbyScope?.querySelector(`[aria-controls="${element.id}"]`);
+        // Unescaped ids build an invalid selector, and the SyntaxError propagates all the way to
+        // ModuleCore.init(), taking the module down for the whole page (TASKS 8.7).
+        const ariaControls = id
+            ? nearbyScope?.querySelector(`[aria-controls="${CSS.escape(id)}"]`)
+            : null;
         if (ariaControls && isVisiblyPresent(ariaControls)) {
             hasVisibleUploadTrigger = true;
             uploadSignals.push('aria-controls-trigger');

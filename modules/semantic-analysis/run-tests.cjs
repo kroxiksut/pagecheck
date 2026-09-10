@@ -29,10 +29,12 @@ async function loadModule(filePath) {
 (async () => {
     const testFiles = [
         path.resolve(__dirname, 'SemanticAnalysisCore.test.mjs'),
+        path.resolve(__dirname, 'coreDefects.test.mjs'),
         path.resolve(__dirname, '../prompt-splitting/collectors/PromptCandidateCollector.test.mjs'),
         path.resolve(__dirname, '../prompt-splitting/reconstruction/PromptReconstructionEngine.test.mjs'),
         path.resolve(__dirname, '../prompt-splitting/reconstruction/PromptDecisionEngine.test.mjs'),
         path.resolve(__dirname, '../prompt-splitting/reconstruction/PromptFindingState.test.mjs'),
+        path.resolve(__dirname, '../prompt-splitting/reconstruction/partialSemantics.test.mjs'),
         path.resolve(__dirname, '../prompt-splitting/runtime/PromptMutationQueue.test.mjs'),
         path.resolve(__dirname, '../prompt-splitting/PromptSplittingConfig.test.mjs'),
         path.resolve(__dirname, '../prompt-splitting/tests/PromptSplittingCorpus.test.mjs'),

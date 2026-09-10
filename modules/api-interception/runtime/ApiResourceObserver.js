@@ -22,7 +22,13 @@ export default class ApiResourceObserver {
         onStateChange = null,
         onObservationBatch = null
     } = {}) {
-        this.webRequest = webRequest;
+        // Раньше здесь фиксировалось ЗНАЧЕНИЕ chrome.webRequest на момент инициализации service
+        // worker. Разрешение опциональное и модуль выключен по умолчанию, поэтому при чистом старте
+        // это значение - undefined, и оно сохранялось навсегда: после выдачи разрешения Chrome
+        // добавляет chrome.webRequest в namespace, но наблюдатель держал устаревшую ссылку и до
+        // перезапуска SW отдавал status: 'unavailable' (TASKS 13.2). Инъекция сохраняется для
+        // тестов, а рабочий путь резолвится лениво - в момент обращения.
+        this.injectedWebRequest = webRequest || null;
         this.clock = clock;
         this.onStateChange = typeof onStateChange === 'function' ? onStateChange : null;
         this.onObservationBatch = typeof onObservationBatch === 'function' ? onObservationBatch : null;
@@ -39,6 +45,10 @@ export default class ApiResourceObserver {
         this.observerUnavailable = false;
         this.counters = this.createCounters();
         this.listeners = null;
+    }
+
+    get webRequest() {
+        return this.injectedWebRequest || globalThis.chrome?.webRequest || globalThis.browser?.webRequest || null;
     }
 
     activate(context) {
@@ -96,6 +106,11 @@ export default class ApiResourceObserver {
         this.lifecycleState = 'pausing';
         this.unregisterListeners();
         this.clearSession();
+        // observerUnavailable писался только в activate(), поэтому после одной неудачной активации
+        // каждая последующая пауза публиковала 'unavailable' вместо 'not-observed' - наблюдатель
+        // выглядел сломанным, когда он просто простаивает (TASKS 13.7). Пересчитываем по факту:
+        // «недоступен сейчас», а не «когда-то не удалось активировать».
+        this.observerUnavailable = !this.isWebRequestAvailable();
         this.lifecycleState = 'inactive';
         this.publishState();
     }

@@ -1,5 +1,5 @@
 import { createFinding, getMessage } from '../utils/findingFactory.js';
-import { getElementMarker, getNormalizedText, isPasswordInput, resolveZIndex } from '../utils/domUtils.js';
+import { getElementMarker, getNormalizedText, hasNonWhitespaceText, isPasswordInput, resolveZIndex } from '../utils/domUtils.js';
 
 export function scanOverlays({ element, style, module }) {
     const findings = [];
@@ -28,7 +28,16 @@ export function scanOverlays({ element, style, module }) {
         findings.push(clickCaptureFinding);
     }
 
-    if (overlaysEnabled && !fullScreenOverlayFinding && !clickCaptureFinding && module.isLikelyOverlay(style, element)) {
+    // The fallback also has to yield to a deceptive-capture finding on the same node, the way the
+    // click-capture branch above does - otherwise one node is reported twice, once precisely and
+    // once generically (TASKS 8.12).
+    if (
+        overlaysEnabled
+        && !deceptiveCaptureFinding
+        && !fullScreenOverlayFinding
+        && !clickCaptureFinding
+        && module.isLikelyOverlay(style, element)
+    ) {
         findings.push(
             createFinding({
                 type: 'overlay',
@@ -73,7 +82,19 @@ function scanSuspiciousStackingPattern({ element, style, module, relatedFindings
         'overlay'
     ].includes(type));
 
-    if (!hasRelatedOverlayFinding && currentStackingSignals.length < 2 && markerSignals.length === 0) {
+    // Everything past this point costs up to five full-viewport hit tests plus a computed style and
+    // a closest() per layer, so the gate has to be worth that price (TASKS 8.5). Two generic
+    // stacking-context signals are not: `transform` plus `opacity` describes an ordinary animated
+    // card, a carousel or a sticky header, and that pair alone used to buy a hit test on nearly
+    // every page. A layer that actually covers other content is positioned - an in-flow element has
+    // nothing to lay itself over - so a positioned box is required unless the element already looks
+    // like an overlay by name or already produced an overlay finding.
+    // Note this cannot be expressed through `position-z-index` from resolveStackingContextSignals:
+    // resolveZIndex() maps `auto` to 0, so that signal silently demands an explicit non-zero
+    // z-index, which a fixed full-page layer does not need.
+    const isPositionedLayer = ['fixed', 'absolute', 'sticky'].includes(style.position);
+    const hasStackingEvidenceWorthTesting = currentStackingSignals.length >= 2 && isPositionedLayer;
+    if (!hasRelatedOverlayFinding && markerSignals.length === 0 && !hasStackingEvidenceWorthTesting) {
         return null;
     }
 
@@ -377,7 +398,7 @@ function scanDeceptiveCaptureSurface({ element, style, module }) {
     const opacity = Number.parseFloat(style.opacity);
     const isOpacityZero = Number.isFinite(opacity) && opacity === 0;
     const isNearTransparent = Number.isFinite(opacity) && opacity > 0 && opacity <= 0.12;
-    const hasNoVisibleText = getNormalizedText(element).length === 0;
+    const hasNoVisibleText = !hasNonWhitespaceText(element, 1);
     const hasNoVisualBox = isVisualBoxWeak(style);
     const hasSuppressionSignals = style.clip !== 'auto' || style.clipPath !== 'none' || style.filter === 'opacity(0)';
 
@@ -510,7 +531,7 @@ function resolveHiddenOverlaySignals(element, style) {
     const opacity = Number.parseFloat(style.opacity);
     const hasOpacityZero = Number.isFinite(opacity) && opacity === 0;
     const hasNearTransparent = Number.isFinite(opacity) && opacity > 0 && opacity <= 0.12;
-    const hasNoVisibleText = getNormalizedText(element).length === 0;
+    const hasNoVisibleText = !hasNonWhitespaceText(element, 1);
     const hasNoVisualBox = isVisualBoxWeak(style);
     const signals = [];
 

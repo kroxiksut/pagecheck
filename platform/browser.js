@@ -8,7 +8,13 @@ function getStorageArea(areaName) {
     return area;
 }
 
-function callStorageMethod(areaName, methodName, ...args) {
+// `async` здесь несёт смысл, а не стиль: getStorageArea() бросает на отсутствующей области, и в
+// синхронной функции это исключение вылетало ДО того, как возвращался промис. Функция,
+// объявленная возвращать промис, иногда бросала синхронно - а вызывающие пишут
+// `.catch(() => ({}))` (utils/config-manager.js, migrateFromPreviousVersion), и такой catch
+// синхронный бросок не ловит: восстановление, написанное ради устойчивости, не срабатывало бы
+// именно там, где нужно. С `async` любой бросок внутри становится отказом промиса.
+async function callStorageMethod(areaName, methodName, ...args) {
     const area = getStorageArea(areaName);
     if (globalThis.browser) {
         return Promise.resolve(area[methodName](...args));

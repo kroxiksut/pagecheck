@@ -1,9 +1,11 @@
 import { createFinding, getMessage } from '../utils/findingFactory.js';
+import { SEVERITY_LEVELS, lowerSeverity, maxSeverity } from '../utils/severityModel.js';
 import {
     findHidingSource,
     getElementMarker,
     getNormalizedText,
     hasExtremeMatrixTranslate,
+    hasNonWhitespaceText,
     hasExtremeTranslateFunction,
     parseLengthToPx
 } from '../utils/domUtils.js';
@@ -15,6 +17,7 @@ const OFFSCREEN_THRESHOLD_PX = 24;
 // an equality check. The band demands supporting context, exactly like anomalously small font-size.
 const TRANSPARENT_TEXT_ALPHA_THRESHOLD = 0.05;
 
+// @data-list (см. комментарий ниже: что это, чем оборачивается устаревание)
 // Hiding strategies in evaluation order. The first one to produce a finding wins; a strategy that
 // matched its condition but was then cleared by its own benign gate returns [] and the next one
 // gets its turn, which is exactly how the original single-function fall-through behaved.
@@ -42,18 +45,91 @@ export function scanHiddenText({ element, style, module }) {
     // Deciding it per strategy measurably backfired: a branch would decline, the next one would
     // claim the very same element anyway - sometimes at a higher severity - and the element ended
     // up reported through a less precise reason than the one that had just cleared it.
-    if (isWeakBenignCase(context, style)) {
+    //
+    // Outcome of that evidence follows the single rule of TASKS 9.5 (see hasHidablePayload): it
+    // silences the element only while there is nothing worth hiding in it, and lowers the verdict
+    // otherwise. Before R4 this gate suppressed unconditionally while the structurally identical
+    // container evidence in `display: none` lowered - two policies for one class of evidence.
+    const weakBenignEvidence = hasWeakBenignEvidence(context, style);
+    if (weakBenignEvidence && !hasHidablePayload(context)) {
         return [];
     }
 
     for (const detectStrategy of HIDDEN_TEXT_STRATEGIES) {
         const findings = detectStrategy(context);
         if (findings.length > 0) {
-            return findings;
+            return adjustHiddenTextSeverity(findings, context, style, detectStrategy, weakBenignEvidence);
         }
     }
 
+    // Nothing claimed the element outright; a strategy that could only offer a doubtful verdict
+    // gets its turn now (see noteFallbackFindings).
+    const fallbackFindings = context.takeFallbackFindings();
+    if (fallbackFindings.length > 0) {
+        return adjustHiddenTextSeverity(fallbackFindings, context, style, null, weakBenignEvidence);
+    }
+
     return [];
+}
+
+// Severity corrections that belong to the ELEMENT rather than to the winning strategy (TASKS 9.3,
+// 9.5). Both are applied here, in this order, because they answer different questions and the
+// second one is meant to have the last word:
+//  1. a hiding mechanism the winning strategy did not look at raises the floor - adding a second
+//     way to hide the same text must never make the verdict milder;
+//  2. benign evidence the page author controls decides the outcome - silence when the element has
+//     no room for a payload, one step down otherwise.
+// Suppression happens HERE and not inside a strategy on purpose: a strategy that declines merely
+// hands the element to the next one, which then reports it through a less precise reason and
+// occasionally at a HIGHER severity. Measured, not assumed - doing it in the branch moved 173
+// findings on the adversarial corpus, `display-none low` -> `visibility-hidden medium` among them.
+function adjustHiddenTextSeverity(findings, context, style, winningStrategy, weakBenignEvidence) {
+    const benignEvidence = weakBenignEvidence || context.hasBenignEvidence();
+    if (benignEvidence && !hasHidablePayload(context, context.getBenignPayloadElement())) {
+        return [];
+    }
+
+    const severityFloor = resolveMaskedMechanismSeverity(context, style, winningStrategy);
+    if (!severityFloor && !benignEvidence) {
+        return findings;
+    }
+
+    return findings.map((finding) => {
+        let severity = severityFloor ? maxSeverity(finding.severity, severityFloor) : finding.severity;
+        if (benignEvidence) {
+            severity = lowerSeverity(severity);
+        }
+        return severity === finding.severity ? finding : { ...finding, severity };
+    });
+}
+
+// TASKS 9.3: severity used to be decided by the ORDER of the strategy list. The first strategy to
+// match returns its own constant, so `opacity: 0` (third, `low`) claimed elements that
+// `font-size: 0` (fifth, `medium`) would have reported - adding a second hiding mechanism LOWERED
+// the verdict, which is exactly backwards and a one-line bypass.
+//
+// Only font-size needs correcting, and that is a reachability result, not an omission:
+//  - `display: none` and `visibility: hidden` run first and second, so nothing milder can claim
+//    their elements in the first place;
+//  - `contrast` and `text-indent` reach `medium` only through their own context-signal counts, so
+//    their verdict is not a property of the element alone and cannot be reconstructed cheaply here;
+//  - `off-screen` and `generic` are already the mildest branches.
+// The check reads only fields of the already-resolved computed style, so it costs no DOM work, and
+// it applies the font-size branch's OWN benign gate - otherwise this would resurrect precisely the
+// cases that branch declines (icon/badge, <sup>/<sub>), the defect class of 8.8.
+function resolveMaskedMechanismSeverity(context, style, winningStrategy) {
+    if (winningStrategy === detectFontSizeSuppression) {
+        return '';
+    }
+
+    const computedFontSizePx = Number.parseFloat(style.fontSize);
+    // Only the unconditional band (<= 1px) counts: above it the branch itself demands two context
+    // signals before it reports at all.
+    if (!Number.isFinite(computedFontSizePx) || computedFontSizePx > 1) {
+        return '';
+    }
+
+    return isBenignSmallText(context, computedFontSizePx <= 0.01) ? '' : 'medium';
 }
 
 // Per-element scan context. Everything derived is lazy and memoized: colors cost an ancestor walk
@@ -70,6 +146,9 @@ function createHiddenTextScanContext({ element, style, module }) {
     let textLength;
     let marker;
     let viewport;
+    let benignEvidence = false;
+    let benignPayloadElement = null;
+    let fallbackFindings = null;
 
     return {
         element,
@@ -77,6 +156,40 @@ function createHiddenTextScanContext({ element, style, module }) {
         module,
         hiddenTextDisplayMode,
         tagName: element.tagName?.toLowerCase() || '',
+        // Benign evidence discovered INSIDE a strategy (today: the revealable container behind a
+        // `display: none`) is reported up rather than acted on locally. Acting locally meant the
+        // strategy returned nothing and the next one claimed the very same element - sometimes at a
+        // higher severity - so a benign signal could RAISE the verdict. The outcome is decided once
+        // per element in scanHiddenText, by the single rule of TASKS 9.5.
+        noteBenignEvidence(payloadElement) {
+            benignEvidence = true;
+            if (payloadElement && !benignPayloadElement) {
+                benignPayloadElement = payloadElement;
+            }
+        },
+        hasBenignEvidence() {
+            return benignEvidence;
+        },
+        // Ёмкость payload меряется у того узла, о котором находка, а не у случайного кандидата:
+        // при свёртке B7 находка адресована скрывающему контейнеру, и «прятать нечего» обязано
+        // относиться к нему. Кандидат - подмножество контейнера, поэтому правило от этого только
+        // строже и никогда не мягче.
+        getBenignPayloadElement() {
+            return benignPayloadElement || element;
+        },
+        // A finding a strategy is willing to report only if no later strategy claims the element.
+        // Used by the contrast branch when its own measurement is unreliable (TASKS 9.4): a doubt
+        // must not outrank a mechanism that is a fact rather than a measurement. Measured: without
+        // this, the branch took 6 elements away from `text-indent` and 4 of them dropped from
+        // medium to low - the very defect 9.3 is about, introduced by the fix for 9.4.
+        noteFallbackFindings(findings) {
+            if (!fallbackFindings) {
+                fallbackFindings = findings;
+            }
+        },
+        takeFallbackFindings() {
+            return fallbackFindings || [];
+        },
         getColorSignals() {
             if (colorSignals === undefined) {
                 colorSignals = resolveColorSignals({ element, style, module });
@@ -142,11 +255,14 @@ function hasOpacityContextSignal(style, threshold) {
 //    or a revealable-component marker. Neither proves the text is readable right now, and both are
 //    trivially added by whoever authored the page. Taken alone they would hand out a one-line
 //    bypass (`transition: opacity .3s` and the detector goes quiet).
-// So weak evidence only suppresses when there is little text to hide. An instruction payload needs
-// room: the shortest realistic one ("ignore all previous instructions") is already over 30 chars,
-// while the UI labels this is meant to silence - tooltips, menu items, badges - sit well below.
-const WEAK_BENIGN_MAX_TEXT_LENGTH = 20;
+// So weak evidence only suppresses when there is little text to hide (hasHidablePayload below,
+// which is now the one rule for every kind of benign evidence in this detector - TASKS 9.5).
+const BENIGN_EVIDENCE_MAX_TEXT_LENGTH = 20;
 
+// @data-list Маркеры имён классов и id, по которым узнаётся раскрываемый UI (меню, тултип,
+// аккордеон): такой блок скрыт по дизайну, а не от человека. Устаревание = ШУМ: незнакомый
+// маркер нового фреймворка делает обычный тултип находкой. Пополнять по ложным срабатываниям
+// на живых страницах, а не превентивно - каждый лишний маркер это дыра для пряток.
 const REVEALABLE_UI_MARKERS = [
     'tooltip', 'dropdown', 'popover', 'popup', 'flyout', 'submenu', 'menu',
     'modal', 'dialog', 'accordion', 'collapse', 'tab', 'panel',
@@ -164,14 +280,57 @@ function hasActiveVisualAnimation(style) {
         || (style.animationName && style.animationName !== 'none');
 }
 
-function isWeakBenignCase(context, style) {
-    if (context.getTextLength() > WEAK_BENIGN_MAX_TEXT_LENGTH) {
-        return false;
-    }
-
+// Порядок операндов - не косметика. getTextLength() читает textContent ВСЕГО поддерева, то есть
+// ровно ту стоимость, которую 8.1 убрал из пробы кандидата; стоя первым, он платился на КАЖДОМ
+// кандидате, хотя нужен только там, где уже есть слабый benign-признак. Оба операнда без побочных
+// эффектов, поэтому проверка признаков идёт раньше чтения текста (TASKS 9.2).
+function hasWeakBenignEvidence(context, style) {
     return hasActiveVisualAnimation(style) || hasRevealableUiMarker(context.getMarker());
 }
 
+// Единственное правило исхода для benign-свидетельства во всём детекторе (TASKS 9.5).
+//
+// Свидетельство, которым распоряжается автор страницы (объявленный transition/animation, маркер
+// раскрываемого компонента, role раскрываемого контейнера), не доказывает, что текст читается
+// прямо сейчас. Поэтому оно НЕ решает вопрос «есть ли находка» - оно решает вопрос «насколько
+// серьёзно». Единственное исключение - когда прятать нечего: у элемента нет ёмкости под payload,
+// и тогда молчание не даёт обхода, потому что обходить нечем.
+//
+// Порог тот же, что был у слабого гейта: самая короткая реалистичная инструкция
+// («ignore all previous instructions») - уже за 30 символов, а ярлыки UI, ради которых гейт и
+// заводился (tooltip, пункт меню, badge), лежат заметно ниже.
+// Считается ОГРАНИЧЕННЫМ обходом, а не длиной нормализованного текста, по двум причинам.
+// Во-первых, стоимость: полное чтение - это `textContent` всего поддерева, ровно та стоимость,
+// которую сняли 8.1 и 9.2, а здесь она была бы уплачена ещё и на скрывающем контейнере, который
+// может быть сколь угодно большим. Обход останавливается на 21-м символе. Во-вторых, смысл: вопрос
+// звучит «есть ли здесь чему прятаться», и пробелы между узлами на него не отвечают - в
+// нормализованной длине они считаются, в ёмкости payload считаться не должны.
+function hasHidablePayload(context, payloadElement = context.element) {
+    return hasNonWhitespaceText(payloadElement, BENIGN_EVIDENCE_MAX_TEXT_LENGTH + 1);
+}
+
+// @data-list Маркеры компактных элементов (иконка, бейдж, счётчик), где короткий текст -
+// норма. Устаревание = ШУМ на новых именах компонентов. Тот же принцип: пополнять по
+// наблюдаемым ложным срабатываниям.
+const COMPACT_UI_MARKERS = ['icon', 'badge', 'counter', 'chip', 'pill', 'tag', 'label'];
+
+// Benign-гейт ветки font-size, вынесенный из неё, чтобы у правила был ровно один текст: тем же
+// гейтом пользуется resolveMaskedMechanismSeverity (TASKS 9.3), и разъехаться они уже не могут.
+// Длина текста читается только тогда, когда она может изменить ответ.
+function isBenignSmallText(context, fontSizeIsZero) {
+    const isDecorativeSmallTextTag = context.tagName === 'sup' || context.tagName === 'sub';
+    const isCompactUiPattern = COMPACT_UI_MARKERS.some((uiMarker) => context.getMarker().includes(uiMarker));
+    if (!isDecorativeSmallTextTag && !isCompactUiPattern && fontSizeIsZero) {
+        return false;
+    }
+
+    const textLength = context.getTextLength();
+    return (isDecorativeSmallTextTag && textLength <= 12)
+        || (isCompactUiPattern && textLength <= 10)
+        || (textLength <= 4 && !fontSizeIsZero);
+}
+
+// @data-list (см. комментарий ниже: что это, чем оборачивается устаревание)
 // --- revealable container evidence (TASKS 6.2-B/B7) ---------------------------------------------
 // The dominant benign case for `display: none` is a tab panel or an accordion section holding a lot
 // of text - exactly what the short-payload rule above cannot silence. Structure is better evidence
@@ -347,12 +506,19 @@ function detectDisplayNone(context) {
     }
     const displayNoneDedupeKey = `hidden-text|display-none|${hiddenTextDisplayMode}|${displayNoneSourcePathSegments.join('/')}`;
 
+    // Container evidence is benign evidence like any other, so the verdict on it is not taken here
+    // (TASKS 9.5): the branch only reports what it found, and scanHiddenText applies the single
+    // rule - silence when there is no payload to hide, one step down otherwise.
+    if (hasRevealableContainerSignal(displayNoneContainer)) {
+        context.noteBenignEvidence(displayNoneContainer);
+    }
+
     return [
         createFinding({
             type: 'hidden-text',
             summary: hiddenTextDisplayNoneSummary,
             details: hiddenTextDisplayNoneDetails,
-            severity: hasRevealableContainerSignal(displayNoneContainer) ? 'low' : 'medium',
+            severity: 'medium',
             detector: 'hiddenTextDetector',
             dedupeKey: displayNoneDedupeKey
         })
@@ -499,20 +665,63 @@ function resolveGlyphAlpha(style, colorParserContext) {
 
 // Techniques where transparent glyph fill is exactly how VISIBLE text is produced. Missing any of
 // these turns the strategy into a false-positive machine on ordinary sites.
+//
+// Каждый признак проверяется по тому, РИСУЕТ ли он что-нибудь, а не по факту наличия свойства
+// (TASKS 9.1). Раньше здесь стояло «свойство задано - значит текст виден», и это давало обход
+// сильного гейта в одну строку: `text-shadow: 0 0 0 transparent` рядом с прозрачным текстом ничего
+// не рисует, но глушил стратегию целиком. Там, где разобрать значение не удалось, остаётся прежнее
+// консервативное «считаем, что рисует»: гейт обязан ошибаться в сторону молчания, а не шума.
+const COLOR_TOKEN_PATTERN = /(?:rgba?|hsla?)\([^)]*\)|#[0-9a-f]{3,8}\b/gi;
+
+// Все цветовые токены значения (у text-shadow их может быть несколько - по одному на тень).
+// null означает «цветов не нашли» - вызывающий трактует это консервативно.
+function hasAnyPaintedColor(rawValue) {
+    if (typeof rawValue !== 'string' || rawValue === '') {
+        return null;
+    }
+
+    const colorTokens = rawValue.match(COLOR_TOKEN_PATTERN);
+    if (!colorTokens || colorTokens.length === 0) {
+        return null;
+    }
+
+    let parsedAny = false;
+    for (const colorToken of colorTokens) {
+        const parsedColor = parseCssColorWithAlpha(colorToken, colorToken);
+        if (!parsedColor) {
+            continue;
+        }
+        parsedAny = true;
+        if (parsedColor.alpha > TRANSPARENT_TEXT_ALPHA_THRESHOLD) {
+            return true;
+        }
+    }
+
+    return parsedAny ? false : null;
+}
+
 function hasVisibleTransparentTextTechnique(style) {
-    // Gradient/clipped-image text: the background is painted through the glyph shapes.
+    // Gradient/clipped-image text: the background is painted through the glyph shapes - но только
+    // если фон вообще есть. `background-clip: text` без изображения и с прозрачным фоном не рисует
+    // ничего.
     if (style.backgroundClip === 'text' || style.webkitBackgroundClip === 'text') {
+        const hasBackgroundImage = Boolean(style.backgroundImage) && style.backgroundImage !== 'none';
+        const backgroundPainted = hasBackgroundImage || hasAnyPaintedColor(style.backgroundColor) !== false;
+        if (backgroundPainted) {
+            return true;
+        }
+    }
+
+    // `color: transparent; text-shadow: 0 0 0 red` - the shadow draws the glyphs. Тень цвета
+    // rgba(...,0) не рисует.
+    if (style.textShadow && style.textShadow !== 'none' && hasAnyPaintedColor(style.textShadow) !== false) {
         return true;
     }
 
-    // `color: transparent; text-shadow: 0 0 0 red` - the shadow draws the glyphs.
-    if (style.textShadow && style.textShadow !== 'none') {
-        return true;
-    }
-
-    // An outline still renders the glyph shapes.
+    // An outline still renders the glyph shapes - если сама обводка не прозрачна.
     const strokeWidth = Number.parseFloat(style.webkitTextStrokeWidth);
-    if (Number.isFinite(strokeWidth) && strokeWidth > 0) {
+    if (Number.isFinite(strokeWidth) && strokeWidth > 0
+        && hasAnyPaintedColor(style.webkitTextStrokeColor) !== false) {
         return true;
     }
 
@@ -662,20 +871,34 @@ function detectFontSizeSuppression(context) {
     }
 
     const textLength = context.getTextLength();
-    const elementMarker = context.getMarker();
-    const isDecorativeSmallTextTag = context.tagName === 'sup' || context.tagName === 'sub';
-    const isCompactUiPattern = elementMarker.includes('icon')
-        || elementMarker.includes('badge')
-        || elementMarker.includes('counter')
-        || elementMarker.includes('chip')
-        || elementMarker.includes('pill')
-        || elementMarker.includes('tag')
-        || elementMarker.includes('label');
-    const isLikelyBenignSmallText = (isDecorativeSmallTextTag && textLength <= 12)
-        || (isCompactUiPattern && textLength <= 10)
-        || (textLength <= 4 && !fontSizeIsZero);
 
-    if (isLikelyBenignSmallText) {
+    if (isBenignSmallText(context, fontSizeIsZero)) {
+        return [];
+    }
+
+    // Собственные сигналы ветки считаются ДО обхода предков (TASKS 9.7): обход платит
+    // getComputedStyle на каждом предке, а гейт ниже отклоняет случай целиком, и тогда обход был
+    // напрасен. Тот же класс, что 8.4. Оба блока без побочных эффектов (кэши контекста
+    // мемоизированы), поэтому перестановка эквивалентна по результату.
+    const fontSizeContextSignalKeys = [];
+    if (module.isOffscreen(element)) {
+        fontSizeContextSignalKeys.push('offscreen');
+    }
+    if (hasOpacityContextSignal(style, 0.45)) {
+        fontSizeContextSignalKeys.push('opacity');
+    }
+    if (hasClippingContextSignal(style, { includeOverflow: true })) {
+        fontSizeContextSignalKeys.push('clipping');
+    }
+    if (hasOverlayContextSignal(style)) {
+        fontSizeContextSignalKeys.push('overlay');
+    }
+    if (context.getColorSignals().hasLowContrastSignal) {
+        fontSizeContextSignalKeys.push('low-contrast');
+    }
+
+    const contextSignalCount = fontSizeContextSignalKeys.length;
+    if (fontSizeIsAnomalouslySmall && contextSignalCount < 2) {
         return [];
     }
 
@@ -709,28 +932,6 @@ function detectFontSizeSuppression(context) {
             fontSizeSource = 'ancestor';
             fontSizeMatchType = hidingSource.matchType;
         }
-    }
-
-    const fontSizeContextSignalKeys = [];
-    if (module.isOffscreen(element)) {
-        fontSizeContextSignalKeys.push('offscreen');
-    }
-    if (hasOpacityContextSignal(style, 0.45)) {
-        fontSizeContextSignalKeys.push('opacity');
-    }
-    if (hasClippingContextSignal(style, { includeOverflow: true })) {
-        fontSizeContextSignalKeys.push('clipping');
-    }
-    if (hasOverlayContextSignal(style)) {
-        fontSizeContextSignalKeys.push('overlay');
-    }
-    if (context.getColorSignals().hasLowContrastSignal) {
-        fontSizeContextSignalKeys.push('low-contrast');
-    }
-
-    const contextSignalCount = fontSizeContextSignalKeys.length;
-    if (fontSizeIsAnomalouslySmall && contextSignalCount < 2) {
-        return [];
     }
 
     const fontSizeSourceLabel = resolveSourceLabel(fontSizeSource);
@@ -780,6 +981,70 @@ function detectFontSizeSuppression(context) {
 
 // --- strategy 5: text/background contrast camouflage -------------------------------------------
 
+// --- rendering-altering effects (TASKS 9.4) ----------------------------------------------------
+// Answers one question: can this `filter` / blend mode change a single pixel? Written to err
+// towards YES - an unrecognised function or an unparsed argument counts as altering, so an effect
+// we failed to understand keeps the cautious "measurement unreliable" verdict rather than granting
+// full confidence. This is the mirror image of hasAnyPaintedColor above, where an unparsed value is
+// treated as painting: in both cases the fallback is the answer that does NOT silence a detector.
+const FILTER_FUNCTION_PATTERN = /([a-z-]+)\(([^)]*)\)/gi;
+const IDENTITY_FILTER_ARGUMENTS = {
+    // Neutral value 1 (or 100%): the effect multiplies by one.
+    opacity: 1, brightness: 1, contrast: 1, saturate: 1,
+    // Neutral value 0 (or 0%, or 0 of any unit): the effect is not applied at all.
+    grayscale: 0, sepia: 0, invert: 0, blur: 0, 'hue-rotate': 0
+};
+
+function isIdentityFilterFunction(functionName, rawArgument) {
+    if (!Object.hasOwn(IDENTITY_FILTER_ARGUMENTS, functionName)) {
+        return false;
+    }
+
+    const argument = (rawArgument || '').trim();
+    if (argument === '') {
+        // An omitted argument means the function's own default, which is never the neutral value
+        // for the multiplicative filters (blur() without a length is invalid CSS anyway).
+        return false;
+    }
+
+    const numeric = Number.parseFloat(argument);
+    if (!Number.isFinite(numeric)) {
+        return false;
+    }
+
+    const neutralValue = IDENTITY_FILTER_ARGUMENTS[functionName];
+    const value = argument.endsWith('%') ? numeric / 100 : numeric;
+    return value === neutralValue;
+}
+
+function hasIdentityFilterValue(rawValue) {
+    const value = (rawValue || '').trim().toLowerCase();
+    if (value === '' || value === 'none') {
+        return true;
+    }
+
+    const functionMatches = [...value.matchAll(FILTER_FUNCTION_PATTERN)];
+    if (functionMatches.length === 0) {
+        return false;
+    }
+
+    // Anything the function pattern did not consume - a url() reference, a nested colour function,
+    // a bare keyword - is unknown territory, and unknown counts as altering.
+    if (value.replace(FILTER_FUNCTION_PATTERN, ' ').trim() !== '') {
+        return false;
+    }
+
+    return functionMatches.every((functionMatch) => isIdentityFilterFunction(functionMatch[1], functionMatch[2]));
+}
+
+function hasRenderingAlteringEffect(style) {
+    if (style.mixBlendMode && style.mixBlendMode !== 'normal') {
+        return true;
+    }
+
+    return !hasIdentityFilterValue(style.filter);
+}
+
 const CONTRAST_CONTEXT_MESSAGE_KEYS = {
     'small-font': 'findingContrastContextSmallFont',
     opacity: 'findingContrastContextOpacity',
@@ -807,11 +1072,21 @@ function detectContrastCamouflage(context) {
         return [];
     }
 
-    const hasFilterOrBlendSignal = (style.mixBlendMode && style.mixBlendMode !== 'normal')
-        || (style.filter && style.filter !== 'none');
+    // TASKS 9.4. A filter or a blend mode does make the computed contrast unreliable - the pixels
+    // the user sees are not the pixels these two colours describe, and `mix-blend-mode` can even
+    // reveal text that measures as invisible. That was previously answered by suppressing the whole
+    // strategy, which turned "we cannot measure this" into "there is nothing here" and handed out a
+    // one-line bypass: `filter: blur(0px)` next to a contrast camouflage silenced BOTH this branch
+    // and styleObfuscationDetector (its own gate needs blur >= 1px, so an identity filter matches
+    // nothing there either). Two levels now:
+    //   - an effect that changes no pixel (blur(0), opacity(1), grayscale(0), ...) is no reason to
+    //     doubt anything, and the strategy runs as usual;
+    //   - a real effect keeps the doubt, but the finding is reported with the measurement marked as
+    //     unreliable and one severity step down, instead of disappearing.
+    const hasUnreliableMeasurementSignal = hasRenderingAlteringEffect(style);
     const hasContrastCamouflageSignal = hasParsedColorPair && (hasNearMatchColorSignal || hasLowContrastSignal);
 
-    if (!hasContrastCamouflageSignal || hasFilterOrBlendSignal) {
+    if (!hasContrastCamouflageSignal) {
         return [];
     }
 
@@ -862,12 +1137,25 @@ function detectContrastCamouflage(context) {
         : 'findingContrastModeLowContrast';
     const contrastModeLabel = getMessage(contrastModeKey, undefined, (hasNearMatchColorSignal ? 'near-match colors' : 'low contrast'));
 
-    const contrastContextLabels = resolveContextLabels(
-        contrastContextSignalKeys,
-        CONTRAST_CONTEXT_MESSAGE_KEYS,
-        'findingContrastContextNone',
-        'none'
-    );
+    // The unreliable-measurement mark is deliberately NOT a member of contrastContextSignalKeys:
+    // that list gates the finding (low-contrast mode needs at least one signal) and drives its
+    // severity, and an unreliable measurement is not corroborating evidence. It only labels what
+    // the reader is looking at.
+    const contrastContextLabels = contrastContextSignalKeys.length === 0 && hasUnreliableMeasurementSignal
+        ? []
+        : resolveContextLabels(
+            contrastContextSignalKeys,
+            CONTRAST_CONTEXT_MESSAGE_KEYS,
+            'findingContrastContextNone',
+            'none'
+        );
+    if (hasUnreliableMeasurementSignal) {
+        contrastContextLabels.push(getMessage(
+            'findingContrastContextUnreliableMeasurement',
+            undefined,
+            'measurement unreliable (filter or blend mode)'
+        ));
+    }
 
     const contrastRatioLabel = Number.isFinite(contrastRatio) ? contrastRatio.toFixed(2) : 'n/a';
     const colorDistanceLabel = Number.isFinite(colorDistance) ? String(Math.round(colorDistance)) : 'n/a';
@@ -885,17 +1173,30 @@ function detectContrastCamouflage(context) {
 
     // Both camouflage modes share the same severity rule; the split exists only for readability.
     const contrastSeverity = contrastContextSignalKeys.length >= 2 ? 'medium' : 'low';
+    const effectiveContrastSeverity = hasUnreliableMeasurementSignal
+        ? lowerSeverity(contrastSeverity)
+        : contrastSeverity;
 
-    return [
+    const contrastFindings = [
         createFinding({
             type: 'hidden-text',
             summary: hiddenTextContrastSummary,
             details: hiddenTextContrastDetails,
-            severity: contrastSeverity,
+            severity: effectiveContrastSeverity,
             detector: 'hiddenTextDetector',
             dedupeKey: `hidden-text|low-contrast|${module.getElementPath(element)}`
         })
     ];
+
+    // An unreliable measurement yields to any later strategy that can state a fact instead
+    // (TASKS 9.4, see noteFallbackFindings). It is still reported when nothing else claims the
+    // element - "we could not measure this" is information, silence is not.
+    if (hasUnreliableMeasurementSignal) {
+        context.noteFallbackFindings(contrastFindings);
+        return [];
+    }
+
+    return contrastFindings;
 }
 
 // --- strategy 6: negative text-indent -----------------------------------------------------------
@@ -1278,9 +1579,18 @@ function detectGeneric(context) {
     // inherited/own values that detectVisibilityHidden and detectOpacityZero always claim first.
     // It is kept as a safety net so that a future strategy suppressing its own case cannot silently
     // drop an outright hidden element.
+    //
+    // Severity (TASKS 9.6): the branch reports at the LOWEST level of the module. It knows nothing
+    // beyond "one of three properties is set" - no source, no context signals, no benign gate - so
+    // it must not outrank a specialised branch that weighed all of that and settled on `low`.
+    // Before this it returned `medium`, which was a mine rather than a live defect: the branch is
+    // unreachable today, but the first benign gate added to `display: none` would have opened it
+    // and returned a case the specialised branch had deliberately declined, at a HIGHER severity.
+    // `opacity` is parsed rather than string-compared, for the same reason detectOpacityZero parses
+    // it: a computed value of '0.0' is the same verdict as '0'.
     const isUnconditionallyHidden = style.display === 'none'
         || style.visibility === 'hidden'
-        || style.opacity === '0';
+        || Number.parseFloat(style.opacity) === 0;
     if (!isUnconditionallyHidden) {
         return [];
     }
@@ -1290,7 +1600,7 @@ function detectGeneric(context) {
             type: 'hidden-text',
             summary: getMessage('findingHiddenTextGenericSummary', undefined, 'Potential hidden or visually suppressed text'),
             details: module.describeElement(element),
-            severity: 'medium',
+            severity: SEVERITY_LEVELS[0],
             detector: 'hiddenTextDetector',
             dedupeKey: `hidden-text|generic|${module.getElementPath(element)}`
         })

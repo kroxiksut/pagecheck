@@ -17,7 +17,8 @@ import {
     createRateLimiter,
     handleFindingsApiRequest,
     normalizePageIdentity,
-    serializeFindings
+    serializeFindings,
+    serializeContext
 } from './findings-api.js';
 
 const ALLOWED_ID = 'abcdefghijklmnopabcdefghijklmnop';
@@ -237,5 +238,74 @@ assert.equal(normalizePageIdentity(''), null, 'empty URL is not described');
 
 assert.deepEqual(serializeFindings(null), [], 'a missing frame snapshot yields no findings');
 assert.deepEqual(serializeFindings({ visualFindings: 'not-an-array' }), [], 'malformed snapshot fields are ignored');
+
+
+// --- контекст страницы (C4): факт о среде, а не вердикт -----------------------------------------
+// Агент, читающий страницу, узнаёт от нас две вещи: смотрит ли её автоматизированный браузер и
+// отнимает ли она главный поток. Ни одна из них не является указанием что-либо делать, и ни одна
+// не влияет на детекторы: `navigator.webdriver` подделывается в обе стороны одной строкой.
+
+{
+    const withContext = handleFindingsApiRequest(getFindings, SENDER, makeContext({
+        getForegroundSnapshot: () => ({
+            ...makeForeground(),
+            frameSnapshot: {
+                ...makeForeground().frameSnapshot,
+                context: { automation: true, longTasksObserved: 4, sliceBackoffSteps: 2, framesPresent: 3, framesAnalyzed: 0, scanBudgetExhausted: false, lastScanActiveMs: 0 }
+            }
+        })
+    }));
+    assert.equal(withContext.ok, true, 'предусловие: ответ обязан быть успешным');
+    assert.deepEqual(
+        withContext.context,
+        { automation: true, longTasksObserved: 4, sliceBackoffSteps: 2, framesPresent: 3, framesAnalyzed: 0, scanBudgetExhausted: false, lastScanActiveMs: 0 },
+        'контекст обязан доезжать до подписчика: без него агент не знает, что мы вообще про среду знаем'
+    );
+    // C2, iframe: граница нашего знания названа вслух. «Фреймы есть, проанализировано ноль» - это
+    // факт об охвате, и подписчик с доступом к дереву фреймов обязан его получить, иначе наше
+    // «чисто» читается как утверждение обо всей странице.
+    assert.equal(withContext.context.framesPresent, 3, 'число фреймов на странице обязано доезжать');
+    assert.equal(withContext.context.framesAnalyzed, 0, 'сегодня анализируется только главный документ, и это обязано быть сказано, а не подразумеваться');
+}
+
+{
+    const withoutContext = handleFindingsApiRequest(getFindings, SENDER, makeContext());
+    assert.equal(withoutContext.context, null, 'нет контекста - null, а не выдуманные нули');
+}
+
+// Ответ обязан пересобирать контекст, а не отдавать пришедшее из страницы как есть.
+{
+    const leaky = handleFindingsApiRequest(getFindings, SENDER, makeContext({
+        getForegroundSnapshot: () => ({
+            ...makeForeground(),
+            frameSnapshot: {
+                ...makeForeground().frameSnapshot,
+                context: { automation: 'yes', longTasksObserved: -5, sliceBackoffSteps: 'many', secret: 'do-not-store' }
+            }
+        })
+    }));
+    assert.deepEqual(
+        leaky.context,
+        { automation: false, longTasksObserved: 0, sliceBackoffSteps: 0, framesPresent: 0, framesAnalyzed: 0, scanBudgetExhausted: false, lastScanActiveMs: 0 },
+        'контекст обязан пересобираться на границе API: лишнее поле не имеет права выйти наружу'
+    );
+    assert.equal(JSON.stringify(leaky).includes('do-not-store'), false, 'постороннее поле не имеет права покинуть расширение');
+}
+
+// Мусор из content-скрипта не имеет права протечь наружу как есть.
+assert.deepEqual(
+    serializeContext({ automation: 'yes', longTasksObserved: -5, sliceBackoffSteps: 'many', extra: 'do-not-store' }),
+    { automation: false, longTasksObserved: 0, sliceBackoffSteps: 0, framesPresent: 0, framesAnalyzed: 0, scanBudgetExhausted: false, lastScanActiveMs: 0 },
+    'контекст пересобирается по известным полям: строка вместо флага не становится true, а лишнее поле не проходит'
+);
+assert.equal(serializeContext(null), null, 'отсутствующий контекст остаётся отсутствующим');
+assert.equal(
+    serializeContext({ framesPresent: 10000 }).framesPresent,
+    100,
+    'число фреймов ограничено потолком: точное значение сверх сотни ничего не добавляет к факту «мы их не смотрели»'
+);
+
+// Версия схемы: новое поле обязано быть отличимо от старой версии, у которой его не было.
+assert.equal(FINDINGS_API_SCHEMA_VERSION, 2, 'добавление context - это новая версия схемы, а не молчаливое расширение ответа');
 
 console.log('findings-api.test.mjs: all assertions passed');

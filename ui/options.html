@@ -79,6 +79,34 @@
                         Comma-separated. An empty list shares with nobody, even when the switch above is on.
                     </p>
                 </section>
+
+                <section class="settings-section">
+                    <div class="section-header">
+                        <h2 data-i18n="activeRemediationSettings">Active remediation</h2>
+                    </div>
+
+                    <p data-i18n="activeRemediationWarning">
+                        Off by default. When enabled, PageCheck changes the page itself instead of only reporting. The page can see those changes and may behave differently when it detects them, and a site's layout may break for you. Changes are undone when you switch this off.
+                    </p>
+
+                    <div class="setting-row">
+                        <label for="active-remediation-enabled" data-i18n="activeRemediationEnabledLabel">Act on hidden content</label>
+                        <input type="checkbox" id="active-remediation-enabled">
+                    </div>
+
+                    <div class="setting-row">
+                        <label for="active-remediation-action" data-i18n="activeRemediationActionLabel">What to do</label>
+                        <select id="active-remediation-action">
+                            <option value="annotate" data-i18n="activeRemediationActionAnnotate">Add a note next to hidden content</option>
+                            <option value="reveal" data-i18n="activeRemediationActionReveal">Make hidden content visible</option>
+                            <option value="neutralize" data-i18n="activeRemediationActionNeutralize">Remove hidden content</option>
+                        </select>
+                    </div>
+
+                    <p data-i18n="activeRemediationHint">
+                        Changes are undone when you switch this off or pick another action, and reloading the page removes them too. If a page strips PageCheck's changes, they are not reapplied - that is reported instead.
+                    </p>
+                </section>
             </div>
 
             <div class="settings-column">

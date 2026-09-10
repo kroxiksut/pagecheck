@@ -20,7 +20,10 @@
 //    the same privacy contract the session cache follows. The finding-to-node map used by active
 //    intervention (TASKS C4.3) must never be reachable from here.
 
-export const FINDINGS_API_SCHEMA_VERSION = 1;
+// 2: добавлен блок `context` (automation / longTasks). Поле новое и необязательное, но версия
+// поднята намеренно: подписчик обязан уметь отличить «контекста нет, потому что версия старая» от
+// «контекста нет, потому что страница чистая».
+export const FINDINGS_API_SCHEMA_VERSION = 2;
 
 export const FINDINGS_API_ACTIONS = {
     HELLO: 'pagecheck.hello',
@@ -144,6 +147,31 @@ export function serializeFindings(frameSnapshot) {
     return findings;
 }
 
+// Контекст пересобирается здесь заново по тем же соображениям, что и findings: внешняя поверхность
+// не имеет права зависеть от того, что лимиты соседнего компонента останутся сегодняшними.
+export function serializeContext(context) {
+    if (!context || typeof context !== 'object') {
+        return null;
+    }
+    const count = (value) => (Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0);
+    return {
+        automation: context.automation === true,
+        longTasksObserved: count(context.longTasksObserved),
+        sliceBackoffSteps: count(context.sliceBackoffSteps),
+        // Граница нашего знания, названная вслух. Подписчик, у которого доступ к дереву фреймов есть
+        // (browser-агент), обязан знать, что наше «чисто» относится к главному документу, а не ко
+        // всей странице. Молчание здесь было бы не экономией, а неверным утверждением об охвате.
+        framesPresent: Math.min(count(context.framesPresent), 100),
+        framesAnalyzed: Math.min(count(context.framesAnalyzed), 100),
+        // Суммарный бюджет вкладки исчерпан - часть модулей не работала вовсе. Имена лежат в
+        // `partialModules`, здесь сам факт: подписчик должен уметь отличить «чисто» от «не смотрели».
+        scanBudgetExhausted: context.scanBudgetExhausted === true,
+        lastScanActiveMs: Number.isFinite(context.lastScanActiveMs)
+            ? Math.max(0, Math.round(context.lastScanActiveMs * 100) / 100)
+            : 0
+    };
+}
+
 function buildFindingsResponse(foreground, extensionVersion) {
     const page = normalizePageIdentity(foreground?.url);
     if (!page) {
@@ -165,6 +193,10 @@ function buildFindingsResponse(foreground, extensionVersion) {
         totalFindings: Number.isFinite(foreground?.totalFindings) ? Math.max(0, Math.trunc(foreground.totalFindings)) : 0,
         stale: foreground?.stale === true,
         partialModules,
+        // C4: контекст, а не вердикт. Агент, который читает страницу, узнаёт от нас две вещи:
+        // смотрит ли её автоматизированный браузер и отнимает ли она главный поток. Обе - факты о
+        // среде, и ни одна не является указанием что-либо делать.
+        context: serializeContext(frameSnapshot?.context),
         findings,
         updatedAt: Number.isFinite(foreground?.updatedAt) ? foreground.updatedAt : null
     };

@@ -105,6 +105,23 @@ const backgroundRuntimeSource = await readFile(new URL('../../../js/background.j
 const observerRuntimeSource = await readFile(new URL('./ApiResourceObserver.js', import.meta.url), 'utf8');
 assert.equal(contentRuntimeSource.includes('ApiInterceptorClass'), false);
 assert.equal(contentRuntimeSource.includes('modules/api-interception/ApiInterceptor.js'), false);
+
+// Отрицательного утверждения мало: оно молчит о том, СКОЛЬКО модулей грузится на самом деле, и
+// поэтому три кроссмодульных щита годами считали пятым модулем файл, который не выполняется.
+// Пинуем положительный список: если content-модуль появится или исчезнет, это увидят здесь, а не
+// в отчёте «проверено на всех пяти».
+const LOADED_CONTENT_MODULES = [
+    'modules/visual-manipulation/VisualManipulationDetector.js',
+    'modules/link-domain-security/LinkDomainSecurityDetector.js',
+    'modules/trigger-phrases/TriggerPhrases.js',
+    'modules/prompt-splitting/PromptSplitting.js'
+];
+const loadedModulePaths = [...contentRuntimeSource.matchAll(/getURL\('(modules\/[^']+)'\)/g)].map((match) => match[1]);
+assert.deepEqual(
+    loadedModulePaths,
+    LOADED_CONTENT_MODULES,
+    'js/content.js грузит РОВНО эти четыре детектора; изменился состав - обнови кроссмодульные щиты (loopSafety, timeSlicing, explicitScanErrorLevel)'
+);
 assert.equal(contentRuntimeSource.includes('apiInterceptionFindings'), false);
 assert.equal(contentRuntimeSource.includes('apiInterceptionRevision'), false);
 assert.equal(backgroundRuntimeSource.includes('moduleId !== API_INTERCEPTION_MODULE_ID'), true);

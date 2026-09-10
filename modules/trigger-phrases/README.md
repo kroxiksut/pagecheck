@@ -20,16 +20,17 @@ Scans page text for risky trigger phrases that may indicate manipulation attempt
 - Candidate text is normalized transiently with whitespace, Unicode NFC/NFKC, case, token, and control-character representations.
 - The classifier returns metadata-only matches for instruction override, authority impersonation, sensitive disclosure, safety bypass, hidden action, and supporting context categories.
 - Risk evaluation applies a deterministic evidence/impact severity matrix and then filters the result by sensitivity without changing the assessment itself.
-- The shared `allowIntervention` flag is enabled by default for testing, but the module does not yet annotate or suppress page content.
+- The module does not annotate or suppress page content: its findings are about VISIBLE text, where reveal is meaningless and neutralize would delete what the human is reading - so it publishes no node to the intervention layer.
+- Pause keeps findings AND `candidateIds`, so returning to an unchanged tab needs no rescan (`keepsStateWhilePaused`). That WeakMap is what makes it safe: the same element keeps its id, so a re-analysis after a mutation UPDATES the existing finding instead of adding a duplicate.
 
 ## Detection Scope
-- Visible and hidden DOM text fragments without assessing their visual presentation.
+- Visible and hidden DOM text fragments without assessing their visual presentation. Text is attributed to its nearest owning container; `nav`, `form`, `figure`, `details`, `fieldset`, and `body` count as containers, so text inserted directly into them is analysed.
+- A mutation is attributed to the nearest owning container as well, so inserting an inline element into an existing paragraph is analysed, and removing it clears the finding recorded on that paragraph.
 - Text-bearing attributes `title`, `aria-label`, and `alt` for `img` and `area`.
 - Phrases that resemble prompt override, coercion, or unsafe instruction patterns.
 
 ## Config Keys
 - `enabled`
-- `allowIntervention`
 - `customPatterns`
 - `caseSensitive`
 
@@ -41,7 +42,7 @@ The runtime accepts enabled `literal` entries only. It applies the same Unicode 
 
 Built-in rules, normalization, literal matching, semantic classification, and risk evaluation are provided by `modules/semantic-analysis/SemanticAnalysisCore.js`. This module retains DOM candidate selection, lifecycle, budgets, finding creation, and active-finding deduplication. The shared core receives no DOM, Chrome API, storage, or lifecycle state and returns metadata-only assessments.
 
-The persisted configuration is validated by `ConfigManager` and delivered by the content-level lifecycle. Before an initial or mutation scan, the detector creates an immutable effective configuration containing only `caseSensitive` and `sensitivity`, tagged with a module-local revision. Passive metadata such as `allowIntervention`, `actionOnDetect`, `name`, and `description` is not part of detection configuration; content lifecycle owns activation through `enabled`.
+The persisted configuration is validated by `ConfigManager` and delivered by the content-level lifecycle. Before an initial or mutation scan, the detector creates an immutable effective configuration containing only `caseSensitive` and `sensitivity`, tagged with a module-local revision. Passive metadata such as `actionOnDetect`, `name`, and `description` is not part of detection configuration; content lifecycle owns activation through `enabled`.
 
 ## Runtime Behavior
 - Loaded from `js/content.js` under the module id `Trigger-Phrases`.
@@ -89,11 +90,11 @@ The persisted configuration is validated by `ConfigManager` and delivered by the
 - Must not persist collected page text or user input.
 - Must never analyze password field contents.
 - Must keep custom-pattern source only in local extension storage and redact it from logs.
-- Any future page annotation or suppression should remain behind `allowIntervention`.
+- Any future page annotation or suppression stays behind the runtime gate, not behind a module flag. Active intervention is gated by `settings.activeRemediationEnabled` (off by default) and applied by `js/intervention-layer.js`; this module never writes to the page itself.
 
 ## Planned Next Steps
 - Validate the lifecycle in Chrome with 50+ restored tabs, multiple windows, rapid switching, iframe-heavy pages, and sustained SPA mutations.
-- Consider coalescing mutation roots before the batch timer; the current raw-record queue is safe but intentionally capped at 200 records.
+- Root coalescing no longer walks the whole queue with `contains()` on every insertion: an already-queued ancestor is found by walking the parent chain, and the reverse pass that drops queued descendants runs once per batch (and before an overflow) instead of once per insertion. The queue is still intentionally capped at 200 roots.
 
 ## Integration
 - Loaded by `js/content.js`.

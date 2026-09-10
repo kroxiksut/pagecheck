@@ -14,7 +14,6 @@ Detects prompt-splitting patterns where malicious instructions are distributed a
 ## Current Behavior
 - The module can be instantiated by the shared module manager.
 - It is disabled by default in the current configuration.
-- The shared `allowIntervention` flag is enabled by default for testing.
 - When enabled, it collects/reconstructs candidates, evaluates metadata-only decisions, and reconciles bounded prompt-splitting findings. Findings remain disabled by default with the module.
 - The collector uses iterative, resumable traversal; it does not use the recursive `ModuleCore.firstScan()` implementation.
 
@@ -50,6 +49,8 @@ Detects prompt-splitting patterns where malicious instructions are distributed a
 - `PromptMutationQueue` immediately coalesces bounded live roots and removed candidate identities. Removed subtree text is never read or retained. Overflow preserves known findings, marks the result partial, and requests at most one bounded reconciliation pass during initial work.
 - Initial collection and reconstruction yield in bounded slices. Each scan captures an immutable configuration/lifecycle revision, and stale work aborts before finding commit or status publication.
 - `sensitivity` controls semantic eligibility. `detectionThreshold` only selects the minimum reconstruction confidence: `0..0.33` is `weak`, `0.34..0.66` is `moderate`, and `0.67..1` is `strong`. It does not alter semantic severity.
+- `partial` has one meaning per level. On a candidate it means the evidence for **that** candidate is incomplete (its region was cut short, or its text was truncated), and it caps reconstruction confidence at `moderate`. A page-level collector `partial` is diagnostic only: it marks the scan status and travels with the candidate as `pagePartial`, but never caps confidence — a budget hit elsewhere on the page is not evidence about this candidate.
+- Overflow of the mutation batch requests exactly one full rescan instead of dropping the roots it could not process.
 - Prompt splitting and trigger phrases receive the same validated custom-literal catalog. Pattern source is prepared only in memory, removed from module configuration after preparation, and never logged or cached.
 - A material prompt-finding or completeness change emits a coalesced page-status update. Cache entries retain only the authoritative count, revision, flags, and up to ten localized `{ type, summary }` findings.
 
@@ -79,7 +80,6 @@ Detects prompt-splitting patterns where malicious instructions are distributed a
 
 ## Config Keys
 - `enabled`
-- `allowIntervention`
 - `sensitivity`
 - `detectionThreshold`
 
@@ -120,7 +120,9 @@ Detects prompt-splitting patterns where malicious instructions are distributed a
 - Must work fully locally.
 - Must not persist reconstructed text chains outside local runtime memory.
 - Must avoid broad text harvesting that is not needed for the active heuristic.
-- Any future active intervention should stay behind `allowIntervention`.
+- The module stays passive: for an accepted finding it publishes `emitFindingNode` with the REGION ANCHOR - the container the collector already treats as the region boundary - and never writes to the page itself. Active intervention is gated by `settings.activeRemediationEnabled` (off by default) and applied by `js/intervention-layer.js`, which places a note NEXT TO the anchor: a note inside the container would be our own text inserted into the very block we are reporting on.
+- Anchor references are scan-local: they are collected only while the gate is open, capped, and cleared when the scan configuration finishes - the same contract that keeps DOM nodes out of snapshots.
+- Pause keeps findings AND the candidate/region identity, so returning to an unchanged tab needs no rescan (`keepsStateWhilePaused`). The identity has to survive with them: without it the same element would get a new id after the return and the next mutation would create a SECOND finding for the same region instead of updating the first.
 
 ## Planned Next Steps
 - Complete real-Chrome lifecycle acceptance with 50+ restored tabs, multiple windows, rapid switching, and sustained SPA mutations.

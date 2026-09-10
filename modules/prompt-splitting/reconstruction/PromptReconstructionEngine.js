@@ -179,7 +179,13 @@ export default class PromptReconstructionEngine {
                 diagnostics.regionsSeen += 1;
                 const region = collection.regions[regionIndex];
                 if (processedRegionIds.has(region.id)) {
+                    // Любой выброшенный регион - это непроанализированная часть страницы (C5.2 в
+                    // корневом TASKS). Раньше эта ветка меняла только счётчик, поэтому скан, молча
+                    // выбросивший половину регионов, отчитывался status: 'complete', и коммит
+                    // считался авторитетным - то есть дефект 11.2 маскировался именно тем, что
+                    // должно было его показать (TASKS 11.3).
                     diagnostics.regionsDeduplicated += 1;
+                    markPartial();
                     continue;
                 }
                 if (processedRegionIds.size >= limits.maxDedupeKeys) {
@@ -308,7 +314,20 @@ export default class PromptReconstructionEngine {
                                         text: part.rawText
                                     })),
                                     truncated,
-                                    partial: Boolean(collection.partial || region.partial || truncated)
+                                    // collection.partial - СТРАНИЧНЫЙ флаг коллектора: он взводится
+                                    // любым локальным событием где угодно на странице (бюджет
+                                    // коллектора, элемент с > 128 детьми, контейнер с текстом
+                                    // > 4096 символов, упёрлись в лимит регионов). Раньше он попадал
+                                    // в каждый кандидат как признак качества ЭТОГО кандидата, а
+                                    // PromptDecisionEngine капит такие кандидаты до moderate - при
+                                    // поставляемом по умолчанию пороге 0.8 (= minimumConfidence
+                                    // 'strong') модуль на любой такой странице выдавал НОЛЬ findings,
+                                    // включая настоящие срабатывания, отчитываясь при этом успехом
+                                    // (TASKS 11.1). Решение по развилке: страничный partial остаётся
+                                    // только диагностикой и на уверенность не влияет; в кандидате
+                                    // живёт лишь то, что относится к нему самому.
+                                    partial: Boolean(region.partial || truncated),
+                                    pagePartial: Boolean(collection.partial)
                                 };
                                 try {
                                     await onCandidate(reconstructedCandidate);

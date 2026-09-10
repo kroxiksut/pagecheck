@@ -130,7 +130,12 @@ const partialResult = await reconstruct(collection([
     candidate('candidate-2', 1, [{ sourceType: 'text', rawText: 'previous' }])
 ], { partial: true }));
 assert.equal(partialResult.result.status, 'partial');
-assert.equal(partialResult.emitted.every((item) => item.partial), true);
+// Страничный partial коллектора больше НЕ штампуется на кандидат как признак его собственного
+// качества: он остаётся диагностикой скана (status: 'partial') и отдельным полем pagePartial.
+// Раньше он капил уверенность каждого кандидата до moderate, и при поставляемом по умолчанию пороге
+// 0.8 модуль на такой странице выдавал ноль findings, включая настоящие (TASKS 11.1).
+assert.equal(partialResult.emitted.every((item) => item.pagePartial), true);
+assert.equal(partialResult.emitted.every((item) => item.partial === false), true);
 
 const windowLimitedResult = await reconstruct(splitWords, { limits: { maxCandidatesPerWindow: 2, maxWindows: 1 } });
 assert.equal(windowLimitedResult.result.status, 'partial');
