@@ -108,41 +108,16 @@
     </div>
 </header>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const header = document.querySelector('.pagecheck-header');
-        if (!header) return;
+<!--
+    Здесь был встроенный <script>, который привязывал выпадающее меню помощи и кнопку мобильного
+    меню. Удалён 2026-09-10, и поведение от этого НЕ изменилось: выполниться он не мог в принципе, по
+    двум независимым причинам сразу.
+      1. Компонент вставляется через `container.innerHTML` (js/options.js, loadComponent). Скрипты,
+         добавленные через innerHTML, не выполняются по спецификации HTML - никогда.
+      2. CSP расширения - `script-src 'self'` (manifest.json). Встроенные скрипты на страницах
+         расширения запрещены и в MV3 в принципе.
+    Оставлять его значило держать в файле код, который выглядит рабочим и не является им.
+    Интерактивные элементы шапки (помощь, мобильное меню, пункты меню, ссылки навигации) при этом
+    остаются НЕПРИВЯЗАННЫМИ - решение «привязать или убрать» записано в корневом TASKS.
+-->
 
-        const helpBtn = header.querySelector('.help-btn');
-        const helpDropdown = header.querySelector('.help-dropdown');
-
-        if (helpBtn && helpDropdown) {
-            helpBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const isExpanded = helpDropdown.hidden;
-                helpDropdown.hidden = !isExpanded;
-                helpBtn.setAttribute('aria-expanded', String(!isExpanded));
-            });
-
-            document.addEventListener('click', function() {
-                helpDropdown.hidden = true;
-                helpBtn.setAttribute('aria-expanded', 'false');
-            });
-
-            helpDropdown.addEventListener('click', function(e) {
-                e.stopPropagation();
-            });
-        }
-
-        const mobileMenuBtn = header.querySelector('.mobile-menu-btn');
-        const mobileNav = header.querySelector('.mobile-nav');
-
-        if (mobileMenuBtn && mobileNav) {
-            mobileMenuBtn.addEventListener('click', function() {
-                const isVisible = mobileNav.hidden;
-                mobileNav.hidden = !isVisible;
-                mobileNav.setAttribute('data-visible', String(!isVisible));
-            });
-        }
-    });
-</script>

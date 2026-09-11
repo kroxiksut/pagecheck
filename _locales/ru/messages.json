@@ -3,10 +3,6 @@
         "message": "PageCheck: Сканер безопасности для скрытых элементов и промптов",
         "description": "Название расширения"
     },
-    "extShortName": {
-        "message": "PageCheck: Сканер безопасности",
-        "description": "Короткое название расширения"
-    },
     "extDescription": {
         "message": "Локальный анализ страниц: скрытый текст, обманные слои, фрагменты промптов. Источник сигнала, а не полная защита.",
         "description": "Описание расширения"
@@ -79,26 +75,6 @@
         "message": "Расширенные настройки",
         "description": "Секция расширенных настроек"
     },
-    "rememberTheme": {
-        "message": "Запомнить выбор темы",
-        "description": "Настройка сохранения темы"
-    },
-    "animationSpeed": {
-        "message": "Скорость анимации:",
-        "description": "Настройка скорости анимации"
-    },
-    "fast": {
-        "message": "Быстрая",
-        "description": "Опция быстрой скорости"
-    },
-    "normal": {
-        "message": "Обычная",
-        "description": "Опция обычной скорости"
-    },
-    "slow": {
-        "message": "Медленная",
-        "description": "Опция медленной скорости"
-    },
     "toggleAll": {
         "message": "Переключить все",
         "description": "Кнопка переключения всех модулей"
@@ -167,14 +143,6 @@
         "message": "Включить режим отладки",
         "description": "Настройка режима отладки"
     },
-    "customRules": {
-        "message": "Пользовательские правила (JSON):",
-        "description": "Настройка пользовательских правил"
-    },
-    "customRulesPlaceholder": {
-        "message": "{\"rules\": []}",
-        "description": "Плейсхолдер пользовательских правил"
-    },
     "resetToDefault": {
         "message": "Сбросить настройки",
         "description": "Кнопка сброса настроек"
@@ -186,10 +154,6 @@
     "promptSplitting": {
         "message": "Разделение промптов",
         "description": "Название модуля разделения промптов"
-    },
-    "apiInterceptor": {
-        "message": "Перехватчик API",
-        "description": "Название модуля перехвата API"
     },
     "saveSettings": {
         "message": "Сохранить настройки",
@@ -210,10 +174,6 @@
     "confirmReset": {
         "message": "Вы уверены, что хотите сбросить все настройки по умолчанию?",
         "description": "Сообщение подтверждения сброса"
-    },
-    "popupTitle": {
-        "message": "Сканер безопасности",
-        "description": "Заголовок попапа"
     },
     "active": {
         "message": "Активен",
@@ -262,14 +222,6 @@
     "statusSafe": {
         "message": "Безопасно",
         "description": "Статус безопасно"
-    },
-    "statusWarning": {
-        "message": "Предупреждение",
-        "description": "Статус предупреждение"
-    },
-    "statusDanger": {
-        "message": "Опасность",
-        "description": "Статус опасность"
     },
     "dashboard": {
         "message": "Панель управления",
@@ -414,10 +366,6 @@
     "moduleDescription": {
         "message": "Описание модуля",
         "description": "Общий плейсхолдер описания модуля"
-    },
-    "pagesScanned": {
-        "message": "Страниц просканировано",
-        "description": "Метка счётчика просканированных страниц"
     },
     "scan": {
         "message": "Скан",
@@ -1063,10 +1011,6 @@
         "message": "Hostname записан буквами, имитирующими латинское имя",
         "description": "Заголовок для находки о hostname из букв-двойников латиницы"
     },
-    "findingHostnameMixedPunycodeSummary": {
-        "message": "Смешанный алфавит в hostname с сегментом punycode",
-        "description": "Сводка для детекта смешанного алфавита с punycode в hostname"
-    },
     "findingHostnameMixedScriptSummary": {
         "message": "Смешанный алфавит в hostname может указывать на гомографическую подмену",
         "description": "Сводка для детекта смешанного алфавита в hostname"
@@ -1103,10 +1047,6 @@
         "message": "Режим B: только элемент (меньше ложных срабатываний)",
         "description": "Опция режима B для display none"
     },
-    "visualManipulationDesc": {
-        "message": "Выявляет скрытый текст, скрытые поля ввода, обманные overlay и CSS-манипуляции видимостью",
-        "description": "Описание модуля визуальных манипуляций"
-    },
     "caseSensitive": {
         "message": "Учитывать регистр",
         "description": "Настройка чувствительности к регистру"
@@ -1126,18 +1066,6 @@
     "detectUnsafeProtocols": {
         "message": "Выявлять небезопасные протоколы",
         "description": "Настройка выявления небезопасных протоколов"
-    },
-    "linkDomainSecurityDesc": {
-        "message": "Анализирует ссылки, домены, редиректы, гомографы и небезопасные протоколы",
-        "description": "Описание модуля безопасности ссылок и доменов"
-    },
-    "visualManipulationName": {
-        "message": "Скрытый контент и визуальные манипуляции",
-        "description": "Название модуля визуальных манипуляций"
-    },
-    "linkDomainSecurityName": {
-        "message": "Безопасность ссылок и доменов",
-        "description": "Название модуля безопасности ссылок и доменов"
     },
     "linkDomainSecurity": {
         "message": "Безопасность ссылок и доменов",

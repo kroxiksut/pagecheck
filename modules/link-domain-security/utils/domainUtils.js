@@ -353,6 +353,12 @@ function adaptPunycodeBias(delta, numPoints, isFirstTime) {
 // narrower question - "Latin and Cyrillic" - and the Greek half of the lookalike table added in 6.2
 // was therefore unreachable: `\u03b1pple.com` (Greek alpha in a Latin word) produced no finding at all,
 // not even the whole-script one, because the Latin letters around the alpha disqualify it there.
+// @data-list Письменности Unicode, по которым определяется смешение внутри одной метки домена.
+// Устаревание = ТИШИНА в сторону пропуска: письменность, которой здесь нет, не участвует в проверке
+// смешения вообще, поэтому имя, собранное из латиницы и, например, эфиопского письма, не даст ни
+// одной находки - и об этом ничто не сообщит. Обратного риска (лишний шум) у списка нет: добавление
+// письменности само по себе находок не создаёт, смешение требует ДВУХ письменностей в одной метке.
+// Ревизия: при обновлении набора письменностей Unicode, руками, перед релизом.
 const SCRIPT_PATTERNS = [
     ['latin', /\p{Script=Latin}/u],
     ['cyrillic', /\p{Script=Cyrillic}/u],

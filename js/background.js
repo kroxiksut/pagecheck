@@ -137,13 +137,12 @@ export class BackgroundManager {
                             response = this.getPageLifecycle(sender);
                             break;
 
-                        case 'saveConfig':
-                            response = await this.handleUpdateConfig(request.config);
-                            break;
-
-                        case 'updateConfig':
-                            response = await this.handleUpdateConfig(request.data);
-                            break;
+                        // `saveConfig` и `updateConfig` удалены 2026-09-10: два пишущих обработчика
+                        // одного действия, у которых не было ни одного отправителя. popup и options
+                        // сохраняют конфигурацию напрямую через ConfigManager, а до вкладок она
+                        // доезжает через storage.onChanged -> handleConfigChange. Пишущий
+                        // обработчик без отправителя доступен любому отправителю из контекста
+                        // расширения - это поверхность, за которую никто не платил.
                         case 'runConfigSmokeCheck':
                             response = this.handleRunConfigSmokeCheck();
                             break;
@@ -184,9 +183,9 @@ export class BackgroundManager {
                             response = this.getModuleState(request.moduleId);
                             break;
 
-                        case 'executeModuleAction':
-                            response = await this.handleModuleAction(request.moduleId, request.actionName, request.data);
-                            break;
+                        // `executeModuleAction` удалён 2026-09-10 вместе со своей заглушкой: в
+                        // background он не выполнял ничего, кроме записи в лог ПЕРЕДАННЫХ
+                        // вызывающим данных, и отправителя у него не было.
 
                         default:
                             response = { error: 'Unknown action', action: request.action };
@@ -334,18 +333,6 @@ export class BackgroundManager {
                     });
             }
         });
-    }
-
-    async handleUpdateConfig(newConfig) {
-        Logger.info('Updating configuration');
-
-        const oldConfig = this.config;
-        this.config = await ConfigManager.saveConfig(newConfig);
-
-        await this.applyConfigToAllTabs(oldConfig, this.config);
-        await this.apiPermissionCoordinator?.reconcile();
-
-        return { success: true };
     }
 
     handleRunConfigSmokeCheck() {
@@ -1584,12 +1571,6 @@ export class BackgroundManager {
             });
             throw error;
         }
-    }
-
-    async handleModuleAction(moduleId, actionName, data) {
-        Logger.info(`Module action: ${moduleId}.${actionName}`, data);
-
-        return { success: true, action: actionName };
     }
 
     // Одно сохранение конфигурации поднимает storage.onChanged дважды (ключ пишется и в sync, и в

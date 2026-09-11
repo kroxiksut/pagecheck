@@ -276,7 +276,13 @@ class OptionsManager {
 
         if (moduleKey === 'Prompt-Splitting') {
             return [
+                // `sensitivity` управляет семантической допустимостью находки и хранится в конфиге
+                // модуля, но в интерфейс не выводилась - то есть навсегда оставалась `medium`, как
+                // бы пользователь ни настраивал остальные модули. Это единственный детектор, у
+                // которого её не было; `detectionThreshold` её не заменяет - он выбирает лишь
+                // минимальную уверенность реконструкции и семантическую важность не меняет.
                 { title: 'detectionSettings', fields: [
+                    sensitivity,
                     { type: 'number', key: 'detectionThreshold', label: 'detectionThreshold', min: 0.1, max: 1, step: 0.1 },
                     action
                 ] }

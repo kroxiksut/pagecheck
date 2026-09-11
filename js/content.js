@@ -202,16 +202,9 @@ class ModuleManager {
                     let response;
 
                     switch (request.action) {
-                        case 'updateModules': {
-                            this.invalidatePromptSplittingForIncomingConfig(request.config);
-                            const lifecycleRevision = this.lifecycleRequestRevision;
-                            response = await this.enqueueRuntimeOperation(() => this.handleUpdateModules(
-                                request.modules,
-                                request.config,
-                                lifecycleRevision
-                            ));
-                            break;
-                        }
+                        // `updateModules` удалён 2026-09-10: отправителя у него не было ни одного, а
+                        // конфигурация доезжает до вкладки через `setPageLifecycle`. Сам метод
+                        // `handleUpdateModules()` остаётся - его зовёт путь жизненного цикла.
                         case 'setPageLifecycle': {
                             this.invalidatePromptSplittingForIncomingConfig(request.config);
                             const lifecycleState = request.state === 'active' ? 'active' : 'paused';
@@ -259,14 +252,10 @@ class ModuleManager {
                                 () => this.revertInterventionEdits()
                             );
                             break;
-                        case 'executeModuleAction': {
-                            response = await this.enqueueRuntimeOperation(() => this.handleModuleAction(
-                                request.moduleId,
-                                request.actionName,
-                                request.data
-                            ));
-                            break;
-                        }
+                        // `executeModuleAction` удалён 2026-09-10 вместе с методом: он вызывал
+                        // ПРОИЗВОЛЬНЫЙ метод модуля по имени из сообщения, а отправителя не имел ни
+                        // одного. Такая ветка доступна любому отправителю из контекста расширения -
+                        // тот же класс, от которого уже защищали `handleScanPage`.
                         default:
                             response = { error: 'Unknown action', action: request.action };
                     }
@@ -1204,22 +1193,6 @@ class ModuleManager {
             config: module.config,
             stats: module.getStats ? module.getStats() : null
         };
-    }
-
-    async handleModuleAction(moduleId, actionName, data) {
-        const module = this.modules.get(moduleId);
-        if (!module) return { error: `Module ${moduleId} not found` };
-        if (typeof module[actionName] !== 'function') {
-            return { error: `Action ${actionName} not found in module ${moduleId}` };
-        }
-
-        try {
-            const result = await module[actionName](data);
-            return { success: true, result };
-        } catch (error) {
-            Logger.error(`Error executing action ${actionName} on module ${moduleId}:`, error);
-            return { success: false, error: error.message };
-        }
     }
 
     async sendMessageToBackground(message) {

@@ -3,10 +3,6 @@
         "message": "PageCheck: Security Scanner for Hidden Elements & Prompts",
         "description": "The name of the extension"
     },
-    "extShortName": {
-        "message": "PageCheck: Security Scanner",
-        "description": "The short name of the extension"
-    },
     "extDescription": {
         "message": "Local page analysis: hidden text, deceptive layers, prompt fragments. A signal source, not a full defence.",
         "description": "The description of the extension"
@@ -79,26 +75,6 @@
         "message": "Advanced Settings",
         "description": "Advanced settings section"
     },
-    "rememberTheme": {
-        "message": "Remember theme choice",
-        "description": "Theme persistence setting"
-    },
-    "animationSpeed": {
-        "message": "Animation speed:",
-        "description": "Animation speed setting"
-    },
-    "fast": {
-        "message": "Fast",
-        "description": "Fast speed option"
-    },
-    "normal": {
-        "message": "Normal",
-        "description": "Normal speed option"
-    },
-    "slow": {
-        "message": "Slow",
-        "description": "Slow speed option"
-    },
     "toggleAll": {
         "message": "Toggle All",
         "description": "Toggle all modules button"
@@ -167,14 +143,6 @@
         "message": "Enable debug mode",
         "description": "Debug mode setting"
     },
-    "customRules": {
-        "message": "Custom rules (JSON):",
-        "description": "Custom rules setting"
-    },
-    "customRulesPlaceholder": {
-        "message": "{\"rules\": []}",
-        "description": "Custom rules placeholder"
-    },
     "resetToDefault": {
         "message": "Reset to Default",
         "description": "Reset settings button"
@@ -186,10 +154,6 @@
     "promptSplitting": {
         "message": "Prompt Splitting",
         "description": "Prompt splitting module name"
-    },
-    "apiInterceptor": {
-        "message": "API Interceptor",
-        "description": "API interceptor module name"
     },
     "saveSettings": {
         "message": "Save Settings",
@@ -210,10 +174,6 @@
     "confirmReset": {
         "message": "Are you sure you want to reset all settings to default?",
         "description": "Reset confirmation message"
-    },
-    "popupTitle": {
-        "message": "Security Scanner",
-        "description": "Popup title"
     },
     "active": {
         "message": "Active",
@@ -262,14 +222,6 @@
     "statusSafe": {
         "message": "Safe",
         "description": "Safe status"
-    },
-    "statusWarning": {
-        "message": "Warning",
-        "description": "Warning status"
-    },
-    "statusDanger": {
-        "message": "Danger",
-        "description": "Danger status"
     },
     "dashboard": {
         "message": "Dashboard",
@@ -414,10 +366,6 @@
     "moduleDescription": {
         "message": "Module description",
         "description": "Generic module description placeholder"
-    },
-    "pagesScanned": {
-        "message": "Pages scanned",
-        "description": "Pages scanned counter label"
     },
     "scan": {
         "message": "Scan",
@@ -1063,10 +1011,6 @@
         "message": "Hostname is written in letters that imitate a Latin name",
         "description": "Summary for whole-script confusable hostname finding"
     },
-    "findingHostnameMixedPunycodeSummary": {
-        "message": "Mixed-script hostname with punycode segment",
-        "description": "Summary for mixed-script punycode hostname finding"
-    },
     "findingHostnameMixedScriptSummary": {
         "message": "Mixed-script hostname may indicate homograph spoofing",
         "description": "Summary for mixed-script hostname finding"
@@ -1103,10 +1047,6 @@
         "message": "Mode B: element only (fewer false positives)",
         "description": "Display none mode B option"
     },
-    "visualManipulationDesc": {
-        "message": "Detects hidden text, hidden inputs, deceptive overlays, and CSS-based visual manipulation",
-        "description": "Visual manipulation module description"
-    },
     "caseSensitive": {
         "message": "Case-sensitive matching",
         "description": "Case-sensitive matching setting"
@@ -1126,18 +1066,6 @@
     "detectUnsafeProtocols": {
         "message": "Detect unsafe protocols",
         "description": "Detect unsafe protocol setting"
-    },
-    "linkDomainSecurityDesc": {
-        "message": "Analyzes links, domains, redirects, homographs, and unsafe protocols",
-        "description": "Link and domain security description"
-    },
-    "visualManipulationName": {
-        "message": "Hidden Content & Visual Manipulation",
-        "description": "Visual manipulation module name"
-    },
-    "linkDomainSecurityName": {
-        "message": "Link & Domain Security",
-        "description": "Link and domain security module name"
     },
     "linkDomainSecurity": {
         "message": "Link & Domain Security",

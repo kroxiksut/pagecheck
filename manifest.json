@@ -22,13 +22,10 @@
   },
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting",
     "declarativeNetRequest",
     "webNavigation",
     "notifications",
-    "tabs",
-    "declarativeContent"
+    "tabs"
   ],
   "optional_permissions": [
     "webRequest"
@@ -70,6 +67,7 @@
         "rules/ruleset.json",
         "assets/images/*",
         "utils/*.js",
+        "js/intervention-layer.js",
         "modules/ModuleCore.js",
         "modules/*/*.js",
         "modules/*/*/*.js"

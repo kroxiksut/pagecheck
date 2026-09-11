@@ -54,26 +54,10 @@
         </label>
     </div>
 
-    <div class="theme-advanced">
-        <button class="advanced-toggle" data-i18n="advancedSettings" aria-expanded="false" type="button">
-            Advanced Settings
-        </button>
-
-        <div class="advanced-content" hidden>
-            <div class="setting-row">
-                <label>
-                    <input type="checkbox" id="theme-persistence">
-                    <span data-i18n="rememberTheme">Remember theme choice</span>
-                </label>
-            </div>
-            <div class="setting-row">
-                <label data-i18n="animationSpeed">Animation speed:</label>
-                <select id="animation-speed">
-                    <option value="fast" data-i18n="fast">Fast</option>
-                    <option value="normal" data-i18n="normal" selected>Normal</option>
-                    <option value="slow" data-i18n="slow">Slow</option>
-                </select>
-            </div>
-        </div>
-    </div>
+    <!--
+        Блок «Advanced Settings» удалён 2026-09-10. Кнопка не была привязана ни к чему, поэтому блок
+        за ней (помеченный hidden) не раскрывался никогда, а два контрола внутри - «запоминать выбор
+        темы» и скорость анимации - не читал ни один участок кода. Пользователь видел кнопку, которая
+        на нажатие не отвечает; это неотличимо от сломанного расширения.
+    -->
 </div>

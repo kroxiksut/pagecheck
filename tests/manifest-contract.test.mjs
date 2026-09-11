@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -94,6 +95,57 @@ for (const build of [chromeBuildOne, firefoxBuild]) {
     // расширению. Такой файл в пакете - это чужая версия кода, доехавшая до пользователя.
     const copies = build.inventory.filter((entry) => /копия|\bcopy\b|\(\d+\)\.|\.bak$|~$/i.test(entry.path));
     assert.deepEqual(copies, [], `в пакете не может быть конфликтных копий: ${copies.map((entry) => entry.path).join(', ')}`);
+}
+
+// Каждый путь, объявленный в манифесте, обязан существовать на диске. Проверка добавлена после
+// того, как `js/intervention-layer.js` полгода отсутствовал в web_accessible_resources и клал
+// весь content-скрипт: половина контрактов расширения живёт в манифесте, и до этого дня её не
+// проверял никто. Отсутствующий путь не ломает ни один прогон в Node - он ломает установку.
+{
+    const declaredPaths = [];
+    const addPath = (label, file) => {
+        if (typeof file !== 'string' || !file || file.includes('*')) return;
+        declaredPaths.push({ label, file });
+    };
+
+    addPath('action.default_popup', baseManifest.action?.default_popup);
+    for (const [size, file] of Object.entries(baseManifest.action?.default_icon || {})) addPath(`action.default_icon[${size}]`, file);
+    for (const [size, file] of Object.entries(baseManifest.icons || {})) addPath(`icons[${size}]`, file);
+    addPath('background.service_worker', baseManifest.background?.service_worker);
+    addPath('options_page', baseManifest.options_page);
+    addPath('options_ui.page', baseManifest.options_ui?.page);
+    for (const [index, entry] of (baseManifest.content_scripts || []).entries()) {
+        for (const file of entry.js || []) addPath(`content_scripts[${index}].js`, file);
+        for (const file of entry.css || []) addPath(`content_scripts[${index}].css`, file);
+    }
+    for (const resource of baseManifest.declarative_net_request?.rule_resources || []) addPath(`dnr:${resource.id}`, resource.path);
+    for (const [index, entry] of (baseManifest.web_accessible_resources || []).entries()) {
+        for (const file of entry.resources || []) addPath(`web_accessible_resources[${index}]`, file);
+    }
+    for (const file of firefoxOverlay.background?.scripts || []) addPath('firefox overlay background', file);
+
+    assert.ok(declaredPaths.length > 15, `путей в манифесте найдено подозрительно мало (${declaredPaths.length}) - разбор сломан`);
+
+    const missing = declaredPaths.filter(({ file }) => !existsSync(path.join(projectRoot, file.split('/').join(path.sep))));
+    assert.deepEqual(
+        missing.map(({ label, file }) => `${label}: ${file}`),
+        [],
+        'манифест объявляет пути, которых нет на диске'
+    );
+
+    // Правила DNR: идентификаторы уникальны, действие и приоритет заполнены. Дубликат id Chrome
+    // отвергает молча - правило просто не применяется, и узнать об этом можно только в браузере.
+    const rulesetPath = baseManifest.declarative_net_request?.rule_resources?.[0]?.path;
+    assert.ok(rulesetPath, 'ruleset обязан быть объявлен');
+    const rules = JSON.parse((await readFile(path.join(projectRoot, rulesetPath), 'utf8')).replace(/^\uFEFF/, ''));
+    assert.ok(Array.isArray(rules) && rules.length > 0, 'ruleset обязан содержать правила');
+    const ruleIds = rules.map((rule) => rule.id);
+    assert.equal(new Set(ruleIds).size, ruleIds.length, 'идентификаторы правил DNR обязаны быть уникальными');
+    for (const rule of rules) {
+        assert.ok(Number.isInteger(rule.priority) && rule.priority >= 1, `правило ${rule.id}: приоритет обязан быть целым числом от 1`);
+        assert.ok(typeof rule.action?.type === 'string', `правило ${rule.id}: действие обязано быть указано`);
+        assert.ok(rule.condition && typeof rule.condition === 'object', `правило ${rule.id}: условие обязано быть указано`);
+    }
 }
 
 console.log('Manifest and deterministic package contract checks passed');

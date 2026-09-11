@@ -193,8 +193,14 @@
 |-- tests/
 |   |-- encoding.test.mjs
 |   |-- data-lists.test.mjs                  # shield: every offline data list carries @data-list with its staleness direction (C7.2)
-|   |-- i18n-coverage.test.mjs               # shield: EN/RU key parity, every data-i18n key translated
+|   |-- i18n-coverage.test.mjs               # shield: EN/RU key parity, keys named in markup AND in code, placeholder parity
 |   |-- manifest-contract.test.mjs
+|   |-- options-config-contract.test.mjs     # shield: every rendered field is stored, every stored setting is reachable
+|   |-- permissions-contract.test.mjs       # shield: every declared permission has a caller or a declarative owner; webRequest stays optional
+|   |-- message-protocol-contract.test.mjs  # shield: every sent action is handled; every handler without a sender is declared
+|   |-- ui-controls-contract.test.mjs       # shield: every interactive control is reachable from code; dead ones are declared
+|   |-- web-accessible-contract.test.mjs    # shield: everything the content script loads (and its import chain) is web-accessible
+|   |-- no-network-contract.test.mjs        # shield: the "fully local" promise - no network primitives, every fetch targets extension resources
 |   `-- release-certification.test.mjs
 |
 |-- .gitignore
