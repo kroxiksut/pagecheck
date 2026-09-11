@@ -151,10 +151,6 @@
         "message": "Trigger Phrases",
         "description": "Trigger phrases module name"
     },
-    "promptSplitting": {
-        "message": "Prompt Splitting",
-        "description": "Prompt splitting module name"
-    },
     "saveSettings": {
         "message": "Save Settings",
         "description": "Save settings button"
@@ -382,10 +378,6 @@
     "detectRedirectPatterns": {
         "message": "Detect redirect patterns",
         "description": "Detect redirect pattern setting"
-    },
-    "visualManipulation": {
-        "message": "Hidden Content & Visual Manipulation",
-        "description": "Visual manipulation module label"
     },
     "monitorOnly": {
         "message": "Monitor only",
@@ -1062,10 +1054,6 @@
     "detectUnsafeProtocols": {
         "message": "Detect unsafe protocols",
         "description": "Detect unsafe protocol setting"
-    },
-    "linkDomainSecurity": {
-        "message": "Link & Domain Security",
-        "description": "Link and domain security module label"
     },
     "toggleMenu": {
         "message": "Toggle menu",

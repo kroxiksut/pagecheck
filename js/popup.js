@@ -78,12 +78,27 @@ class PopupManager {
             const row = document.createElement('div');
             row.className = 'module-status';
             row.dataset.module = moduleKey;
-            row.innerHTML = `
-                <span class="module-name">${moduleName}</span>
-                <span class="module-state ${isEnabled ? 'active' : 'inactive'}">
-                    ${isEnabled ? I18n.getMessage('active') : I18n.getMessage('inactive')}
-                </span>
-            `;
+
+            const name = document.createElement('span');
+            name.className = 'module-name';
+            name.textContent = moduleName;
+
+            // Ползунок, а не надпись-кнопка (2026-09-11): строка «Активен» выключала модуль по
+            // нажатию на любое её место, и выключение выглядело случайностью. Переключается только
+            // ползунок - так же, как на странице настроек.
+            const toggle = document.createElement('label');
+            toggle.className = 'switch';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'module-switch';
+            input.setAttribute('role', 'switch');
+            input.setAttribute('aria-label', moduleName);
+            input.checked = isEnabled;
+            const slider = document.createElement('span');
+            slider.className = 'slider';
+            toggle.append(input, slider);
+
+            row.append(name, toggle);
 
             list.appendChild(row);
         });
@@ -105,9 +120,11 @@ class PopupManager {
         const modulesList = document.querySelector('.modules-list');
         if (modulesList && !modulesList.dataset.bound) {
             modulesList.dataset.bound = 'true';
-            modulesList.addEventListener('click', (e) => {
-                const moduleElement = e.target.closest('.module-status');
-                const moduleKey = moduleElement?.dataset.module;
+            modulesList.addEventListener('change', (e) => {
+                if (!e.target.classList?.contains('module-switch')) {
+                    return;
+                }
+                const moduleKey = e.target.closest('.module-status')?.dataset.module;
                 if (moduleKey) {
                     this.toggleModule(moduleKey);
                 }
@@ -328,6 +345,10 @@ class PopupManager {
             );
         } catch (error) {
             Logger.error('Error toggling module:', error);
+            // Ползунок уже стоит в новом положении, а модуль - нет: перечитываем настоящее
+            // состояние и перерисовываем, иначе интерфейс показывает то, чего нет.
+            await this.loadConfig().catch(() => {});
+            this.updateUI();
             this.showNotification(I18n.getMessage('toggleFailed'), 'error');
         }
     }
@@ -367,6 +388,7 @@ class PopupManager {
                 this.showNotification(I18n.getMessage('apiPermissionRemovalFailed'), 'error');
             }
         } catch {
+            this.updateUI();
             this.showNotification(I18n.getMessage('apiPermissionUnavailable'), 'error');
         }
     }

@@ -118,21 +118,55 @@
     color: var(--module-name, #202124);
 }
 
-.module-state {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 8px;
-    font-weight: 500;
+/* Ползунок модуля (2026-09-11): переключается только он, а не вся строка. Та же форма, что у
+   переключателей на странице настроек (styles/components/module-card.css), уменьшенная под popup. */
+.module-status .switch {
+    position: relative;
+    display: inline-block;
+    width: 32px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
-.module-state.active {
-    background: var(--module-active-bg, #e6f4ea);
-    color: var(--module-active-text, #137333);
+.module-status .switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
 }
 
-.module-state.inactive {
-    background: var(--module-inactive-bg, #f1f3f4);
-    color: var(--module-inactive-text, #5f6368);
+.module-status .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--switch-bg, #dadce0);
+    transition: 0.2s;
+    border-radius: 18px;
+}
+
+.module-status .slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background: white;
+    transition: 0.2s;
+    border-radius: 50%;
+}
+
+.module-status input:checked + .slider {
+    background: var(--switch-active-bg, #1a73e8);
+}
+
+.module-status input:checked + .slider:before {
+    transform: translateX(14px);
+}
+
+.module-status input:focus-visible + .slider {
+    outline: 2px solid var(--switch-active-bg, #1a73e8);
+    outline-offset: 2px;
 }
 
 .quick-actions {
@@ -246,10 +280,8 @@
         --scan-btn-hover: #a8c7fa;
         --section-title: #e8eaed;
         --module-name: #e8eaed;
-        --module-active-bg: #1e3a2a;
-        --module-active-text: #81c995;
-        --module-inactive-bg: #3c4043;
-        --module-inactive-text: #9aa0a6;
+        --switch-bg: #5f6368;
+        --switch-active-bg: #8ab4f8;
         --action-btn-bg: #303134;
         --action-btn-border: #5f6368;
         --action-btn-hover-bg: #3c4043;
@@ -288,10 +320,8 @@ body.pagecheck-theme-light .popup-container {
     --scan-btn-hover: #1967d2;
     --section-title: #202124;
     --module-name: #202124;
-    --module-active-bg: #e6f4ea;
-    --module-active-text: #137333;
-    --module-inactive-bg: #f1f3f4;
-    --module-inactive-text: #5f6368;
+    --switch-bg: #dadce0;
+    --switch-active-bg: #1a73e8;
     --action-btn-bg: #ffffff;
     --action-btn-border: #dadce0;
     --action-btn-hover-bg: #f8f9fa;
@@ -314,10 +344,8 @@ body.pagecheck-theme-dark .popup-container {
     --scan-btn-hover: #a8c7fa;
     --section-title: #e8eaed;
     --module-name: #e8eaed;
-    --module-active-bg: #1e3a2a;
-    --module-active-text: #81c995;
-    --module-inactive-bg: #3c4043;
-    --module-inactive-text: #9aa0a6;
+    --switch-bg: #5f6368;
+    --switch-active-bg: #8ab4f8;
     --action-btn-bg: #303134;
     --action-btn-border: #5f6368;
     --action-btn-hover-bg: #3c4043;
@@ -344,10 +372,8 @@ body.pagecheck-theme-dark .popup-container {
         --scan-btn-hover: #a8c7fa;
         --section-title: #e8eaed;
         --module-name: #e8eaed;
-        --module-active-bg: #1e3a2a;
-        --module-active-text: #81c995;
-        --module-inactive-bg: #3c4043;
-        --module-inactive-text: #9aa0a6;
+        --switch-bg: #5f6368;
+        --switch-active-bg: #8ab4f8;
         --action-btn-bg: #303134;
         --action-btn-border: #5f6368;
         --action-btn-hover-bg: #3c4043;

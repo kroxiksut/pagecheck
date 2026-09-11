@@ -151,10 +151,6 @@
         "message": "Триггерные фразы",
         "description": "Название модуля триггерных фраз"
     },
-    "promptSplitting": {
-        "message": "Разделение промптов",
-        "description": "Название модуля разделения промптов"
-    },
     "saveSettings": {
         "message": "Сохранить настройки",
         "description": "Кнопка сохранения настроек"
@@ -382,10 +378,6 @@
     "detectRedirectPatterns": {
         "message": "Выявлять redirect-паттерны",
         "description": "Настройка выявления redirect-паттернов"
-    },
-    "visualManipulation": {
-        "message": "Скрытый контент и визуальные манипуляции",
-        "description": "Метка модуля визуальных манипуляций"
     },
     "monitorOnly": {
         "message": "Только мониторинг",
@@ -1062,10 +1054,6 @@
     "detectUnsafeProtocols": {
         "message": "Выявлять небезопасные протоколы",
         "description": "Настройка выявления небезопасных протоколов"
-    },
-    "linkDomainSecurity": {
-        "message": "Безопасность ссылок и доменов",
-        "description": "Метка модуля безопасности ссылок и доменов"
     },
     "toggleMenu": {
         "message": "Переключить меню",
