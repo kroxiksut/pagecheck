@@ -187,10 +187,6 @@
         "message": "Scan This Page",
         "description": "Scan page button"
     },
-    "threatsBlocked": {
-        "message": "Threats blocked:",
-        "description": "Threats blocked counter"
-    },
     "lastScan": {
         "message": "Last scan:",
         "description": "Last scan time"
@@ -218,10 +214,6 @@
     "currentPage": {
         "message": "Current Page",
         "description": "Current page section"
-    },
-    "statusSafe": {
-        "message": "Safe",
-        "description": "Safe status"
     },
     "dashboard": {
         "message": "Dashboard",
@@ -338,6 +330,10 @@
     "scanFailed": {
         "message": "Scan failed",
         "description": "Scan failed message"
+    },
+    "scanNeedsPageReload": {
+        "message": "PageCheck is not connected to this tab yet. Reload the page and scan again.",
+        "description": "Scan failed because the tab was opened before PageCheck was installed, updated or reloaded, so its content script is not running there"
     },
     "toggleFailed": {
         "message": "Failed to toggle module",
@@ -1118,10 +1114,6 @@
     "loading": {
         "message": "Loading...",
         "description": "Loading placeholder"
-    },
-    "securityScorePlaceholder": {
-        "message": "Score: 95/100",
-        "description": "Security score placeholder"
     },
     "helpPageTitle": {
         "message": "PageCheck Help",

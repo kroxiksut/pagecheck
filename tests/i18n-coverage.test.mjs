@@ -1,7 +1,7 @@
 // Щит для правила локализации из AGENTS.md: пользовательский текст идёт через _locales, и EN и RU
 // правятся ОДНОЙ правкой. Забытый ключ не ломает ничего заметно - элемент просто остаётся с
 // английской заглушкой из разметки или пустеет, поэтому без проверки такая потеря живёт до релиза.
-// Проверяется пять вещей:
+// Проверяется шесть вещей:
 //   1. набор ключей EN и RU совпадает - перевод не отстаёт от оригинала;
 //   2. ни одно сообщение не пустое;
 //   3. каждый data-i18n из разметки есть в обеих локалях;
@@ -9,7 +9,8 @@
 //      локалях - разметка это меньшая часть поверхности, а забытый ключ из кода даёт пустую строку
 //      ровно так же тихо;
 //   5. подстановки EN и RU совпадают - подстановка, потерянная в одном языке, уносит с собой число
-//      или имя, но оставляет предложение грамматически целым, поэтому глазами это не ловится.
+//      или имя, но оставляет предложение грамматически целым, поэтому глазами это не ловится;
+//   6. I18n.getMessage действительно раскрывает эти подстановки, а не отдаёт `$MS$` как есть.
 // Запуск: node tests/i18n-coverage.test.mjs
 
 import assert from 'node:assert/strict';
@@ -139,4 +140,35 @@ for (const key of enKeys) {
     }
 }
 
-console.log(`i18n: ${enKeys.size} ключей в обеих локалях, ${checkedKeys} проверок из разметки ui/, ${checkedCodeKeys} из кода`);
+// --- 6. Подстановки действительно подставляются -------------------------------------------------
+// Пункт 5 сверяет только файлы. Но popup, options и info-page берут текст из загруженного
+// messages.json через I18n.getMessage в обход chrome.i18n, и этот путь раскрывал лишь `$1`:
+// «Сканирование заняло $MS$ мс» дошло до пользователя буквально, при зелёном пункте 5.
+
+const { I18n } = await import(new URL('../utils/i18n.js', import.meta.url));
+const SENTINELS = ['<<1>>', '<<2>>', '<<3>>', '<<4>>', '<<5>>', '<<6>>', '<<7>>', '<<8>>', '<<9>>'];
+
+let resolvedKeys = 0;
+for (const [locale, data] of [['en', en], ['ru', ru]]) {
+    I18n.localeMessages[locale] = data;
+    I18n.currentLanguage = locale;
+    I18n.clearCache();
+    for (const [key, entry] of Object.entries(data)) {
+        if (slotsOf(entry.message).length === 0) continue;
+        const resolved = I18n.getMessage(key, SENTINELS);
+        assert.equal(
+            SLOT_PATTERN.test(resolved),
+            false,
+            `${locale}: ${key} - именованная подстановка дошла до пользователя буквально: "${resolved}"`
+        );
+        SLOT_PATTERN.lastIndex = 0;
+        assert.ok(
+            SENTINELS.some((sentinel) => resolved.includes(sentinel)),
+            `${locale}: ${key} - переданное значение не попало в текст: "${resolved}"`
+        );
+        resolvedKeys += 1;
+    }
+}
+assert.ok(resolvedKeys > 0, 'ключей с подстановками не найдено - проверка зелена впустую');
+
+console.log(`i18n: ${enKeys.size} ключей в обеих локалях, ${checkedKeys} проверок из разметки ui/, ${checkedCodeKeys} из кода, ${resolvedKeys} подстановок раскрыто`);

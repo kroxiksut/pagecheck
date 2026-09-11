@@ -187,10 +187,6 @@
         "message": "Сканировать страницу",
         "description": "Кнопка сканирования страницы"
     },
-    "threatsBlocked": {
-        "message": "Угроз заблокировано:",
-        "description": "Счётчик заблокированных угроз"
-    },
     "lastScan": {
         "message": "Последнее сканирование:",
         "description": "Время последнего сканирования"
@@ -218,10 +214,6 @@
     "currentPage": {
         "message": "Текущая страница",
         "description": "Секция текущей страницы"
-    },
-    "statusSafe": {
-        "message": "Безопасно",
-        "description": "Статус безопасно"
     },
     "dashboard": {
         "message": "Панель управления",
@@ -338,6 +330,10 @@
     "scanFailed": {
         "message": "Ошибка сканирования",
         "description": "Сообщение об ошибке сканирования"
+    },
+    "scanNeedsPageReload": {
+        "message": "PageCheck ещё не подключён к этой вкладке. Перезагрузите страницу и повторите сканирование.",
+        "description": "Скан не удался, потому что вкладка открыта до установки, обновления или перезагрузки PageCheck, и content-скрипт в ней не запущен"
     },
     "toggleFailed": {
         "message": "Не удалось переключить модуль",
@@ -1118,10 +1114,6 @@
     "loading": {
         "message": "Загрузка...",
         "description": "Плейсхолдер загрузки"
-    },
-    "securityScorePlaceholder": {
-        "message": "Оценка: 95/100",
-        "description": "Плейсхолдер оценки безопасности"
     },
     "helpPageTitle": {
         "message": "Справка PageCheck",

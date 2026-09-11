@@ -55,7 +55,6 @@ class PopupManager {
 
     updateUI() {
         this.updateModuleStatuses();
-        this.updateStats();
         const versionNode = document.getElementById('version-number');
         if (versionNode) {
             const manifest = chrome.runtime.getManifest();
@@ -88,17 +87,6 @@ class PopupManager {
 
             list.appendChild(row);
         });
-    }
-
-    updateStats() {
-        const statNodes = document.querySelectorAll('.scan-stats .stat');
-        if (statNodes.length < 2) return;
-
-        const threatsBlocked = this.config?.statistics?.threatsBlocked || 0;
-        const lastScanDate = this.config?.statistics?.lastScanDate || '-';
-
-        statNodes[0].textContent = `${I18n.getMessage('threatsBlocked')} ${threatsBlocked}`;
-        statNodes[1].textContent = `${I18n.getMessage('lastScan')} ${lastScanDate}`;
     }
 
     setupEventListeners() {
@@ -252,12 +240,19 @@ class PopupManager {
             }
         } catch (error) {
             const message = String(error?.message || error);
+            // Chrome не внедряет объявленные content-скрипты во вкладки, открытые до установки или
+            // перезагрузки расширения, а разрешения `scripting`, чтобы внедрить самим, у нас нет.
+            // Причина здесь уже известна, и общее «Ошибка сканирования» прятало единственное
+            // действие, которое помогает, - перезагрузить страницу.
             if (message.includes('Content script is not available')) {
-                Logger.warn('Scan skipped: content script is not available on this page');
+                // Штатный случай, и пользователь уже получил понятную подсказку: warn здесь только
+                // пополнял страницу ошибок расширения.
+                Logger.info('Scan skipped: content script is not available on this page');
+                this.showNotification(I18n.getMessage('scanNeedsPageReload'), 'error');
             } else {
                 Logger.error('Scan error:', error);
+                this.showNotification(I18n.getMessage('scanFailed'), 'error');
             }
-            this.showNotification(I18n.getMessage('scanFailed'), 'error');
         } finally {
             this.setLoadingState(false);
         }

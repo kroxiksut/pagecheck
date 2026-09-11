@@ -116,4 +116,23 @@ for (const file of componentFiles) {
     );
 }
 
-console.log(`ui-контролы: ${controls} всего, ${unbound.length} без связи с кодом (все объявлены), компонентов без встроенных скриптов: ${componentFiles.length}`);
+// --- 4. Встроенных обработчиков событий нет ------------------------------------------------------
+// onclick="..." запрещён той же CSP (`script-src 'self'` без 'unsafe-inline'), и неважно, где он
+// написан - в разметке ui/ или в HTML-строке, которую код вставляет через innerHTML. Кнопка
+// рисуется и молча не работает. Так три кнопки options (перезагрузка после ошибки загрузки и
+// закрытие уведомления) были мёртвыми при зелёных проверках выше: те смотрят только в ui/.
+
+const INLINE_HANDLER = /<[a-z][^>]*\son[a-z]+\s*=/i;
+let inlineChecked = 0;
+for (const file of [...htmlFiles, ...jsFiles]) {
+    const text = readFileSync(file, 'utf8').replace(/<!--[\s\S]*?-->/g, ' ');
+    const offending = text.split(/\r?\n/).filter((line) => INLINE_HANDLER.test(line) && !/^\s*\/\//.test(line));
+    assert.deepEqual(
+        offending.map((line) => line.trim()),
+        [],
+        `${file.slice(ROOT.length + 1)}: встроенный обработчик события не выполнится (CSP script-src 'self') - повесь его через addEventListener`
+    );
+    inlineChecked += 1;
+}
+
+console.log(`ui-контролы: ${controls} всего, ${unbound.length} без связи с кодом (все объявлены), компонентов без встроенных скриптов: ${componentFiles.length}, файлов без встроенных обработчиков: ${inlineChecked}`);

@@ -1751,7 +1751,11 @@ export default class TriggerPhrases extends ModuleCore {
             || this.elementsSkippedByTime > 0
             || this.scanTimeBudgetReached > 0
             || this.ruleEvaluationsSkippedByBudget > 0) {
-            Logger.warn(`[${this.moduleName}] Scan budget reached: ${this.candidatesSkippedByLimit} candidates, ${this.normalizedSegmentsSkippedByBudget} normalized segments, ${this.ruleEvaluationsSkippedByBudget} rule families, ${this.mutationsSkippedByLimit} mutations, ${this.mutationNodesSkippedByLimit} mutation nodes, ${this.elementsSkippedByLimit} queued elements by count, ${this.elementsSkippedByTime} queued elements by time`);
+            // info, а не warn (2026-09-11): бюджет на тяжёлой странице - штатный исход, а не сбой.
+            // visual и link сообщают о том же через info, неполнота скана видна в снапшоте
+            // (partialResult). warn попадал на страницу ошибок расширения в chrome://extensions и
+            // выглядел как поломка, заслоняя настоящие ошибки.
+            Logger.info(`[${this.moduleName}] Scan budget reached: ${this.candidatesSkippedByLimit} candidates, ${this.normalizedSegmentsSkippedByBudget} normalized segments, ${this.ruleEvaluationsSkippedByBudget} rule families, ${this.mutationsSkippedByLimit} mutations, ${this.mutationNodesSkippedByLimit} mutation nodes, ${this.elementsSkippedByLimit} queued elements by count, ${this.elementsSkippedByTime} queued elements by time`);
         }
     }
 

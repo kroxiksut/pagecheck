@@ -28,6 +28,9 @@ export class BackgroundManager {
         this.requestedFocusedWindowId = chrome.windows.WINDOW_ID_NONE;
         this.foregroundTransitionRevision = 0;
         this.foregroundTransitionQueue = Promise.resolve();
+        // Стартовый переход foreground: init() его не ждёт (взаимная блокировка), а обработчик
+        // активации вкладки ждёт - см. handleTabActivated.
+        this.initialForegroundRefresh = null;
         this.apiObservationRevision = 0;
         this.apiObserverSignature = '';
         this.apiObservationState = null;
@@ -103,9 +106,17 @@ export class BackgroundManager {
             await this.restorePageStatusCache();
             await this.restoreActiveTabs();
             await this.apiPermissionCoordinator.reconcile();
-            await this.enqueueForegroundTransition(
+            // Переход НЕ ждётся (2026-09-11, найдено в браузере). Он ждёт ответа вкладки на
+            // setPageLifecycle, а вкладка, чтобы ответить, публикует статус и ждёт ответа от нас -
+            // обработчик которого ждёт готовности, то есть конца этого init(). Взаимная блокировка:
+            // при каждом пробуждении worker с живой foreground-вкладкой всё висело, пока Chrome не
+            // останавливал worker, и content-скрипты, стартовавшие в это время, получали «message
+            // channel closed» и оставались без конфигурации до перезагрузки страницы. Переход
+            // по-прежнему встаёт в общую очередь и вытесняется более новым (latest-wins).
+            // Щит: js/backgroundWakeDeadlock.test.mjs.
+            this.initialForegroundRefresh = this.enqueueForegroundTransition(
                 (foregroundRevision) => this.refreshForegroundTab(null, foregroundRevision)
-            );
+            ).catch((error) => Logger.error('Initial foreground refresh failed:', error));
 
             Logger.info('Background service worker started successfully');
 
@@ -764,6 +775,11 @@ export class BackgroundManager {
     async handleTabActivated(activeInfo) {
         Logger.debug(`Tab activated: ${activeInfo.tabId}`);
         this.applyIndicatorForTab(activeInfo.tabId);
+        // Стартовый переход init() не ждёт (см. там), и пока он не узнал окно в фокусе,
+        // requestedFocusedWindowId ещё пуст: активация, пришедшая во время старта, отбрасывалась
+        // бы как «не то окно». Ждать его здесь безопасно - content-скрипт обработчиков событий
+        // вкладок не ждёт, поэтому цикла, как с init(), не возникает.
+        await this.initialForegroundRefresh;
         if (activeInfo.windowId === this.requestedFocusedWindowId) {
             if (activeInfo.tabId === this.foregroundTabId) {
                 return { success: true, skipped: 'unchanged-foreground' };
@@ -884,7 +900,9 @@ export class BackgroundManager {
         } catch (error) {
             const message = String(error?.message || error);
             if (message.includes('Receiving end does not exist')) {
-                Logger.warn(`Scan skipped for tab ${tabId}: content script is not available on this page`);
+                // Штатный случай (вкладка открыта до загрузки расширения), пользователю popup
+                // показывает подсказку. warn только пополнял страницу ошибок расширения.
+                Logger.info(`Scan skipped for tab ${tabId}: content script is not available on this page`);
                 return { success: false, error: 'Content script is not available on this page' };
             }
 

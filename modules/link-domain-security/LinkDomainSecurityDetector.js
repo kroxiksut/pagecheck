@@ -50,6 +50,9 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
         this.mutationScanTimeBudgetMs = 25;
         this.mutationThrottle = 500;
         this.recentFindings = [];
+        // Запись recentFindings -> ключ её находки. Ключ наружу не выходит (7.16), но запись
+        // должна уметь найти свою находку, когда узлы той уйдут со страницы (Б1).
+        this.recentFindingKeys = new WeakMap();
         this.seenFindingKeys = new Set();
         this.maxFindingKeys = 5000;
         this.pendingMutationRoots = new Set();
@@ -83,6 +86,7 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
         this.resetStats();
         this.recentFindings = [];
         this.seenFindingKeys.clear();
+        this.findingAnchors.clear();
         this.resetErrorState();
         this.resetWorkStats();
         this.beginScanBatch(
@@ -354,10 +358,27 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
             if (this.seenFindingKeys.size >= this.maxFindingKeys) {
                 const oldestKey = this.seenFindingKeys.values().next().value;
                 this.seenFindingKeys.delete(oldestKey);
+                // Вытесненная находка остаётся посчитанной: снимать её по узлам больше нельзя (Б1).
+                this.findingAnchors.delete(oldestKey);
             }
             this.seenFindingKeys.add(dedupeKey);
             return true;
         });
+    }
+
+    // Б1: находка, чьих узлов больше нет в документе, уходит из счётчика, из списка и из ключей -
+    // вернувшись на страницу, она будет найдена заново. Находки уровня страницы (хостнейм, <base>)
+    // узлов не имеют и живут до следующего полного скана, как и раньше.
+    pruneDetachedFindings() {
+        const detachedKeys = this.collectDetachedFindingKeys();
+        if (detachedKeys.length === 0) {
+            return 0;
+        }
+        const detached = new Set(detachedKeys);
+        detachedKeys.forEach((key) => this.seenFindingKeys.delete(key));
+        this.recentFindings = this.recentFindings.filter((entry) => !detached.has(this.recentFindingKeys.get(entry)));
+        this.stats.threatsDetected = Math.max(0, this.stats.threatsDetected - detachedKeys.length);
+        return detachedKeys.length;
     }
 
     // `isLink` is passed in rather than re-derived: scanElement already classified this element, and
@@ -408,7 +429,14 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
             return;
         }
 
-        const acceptedFindings = this.acceptFindings(normalizeFindings(findings));
+        const normalizedFindings = normalizeFindings(findings);
+        const acceptedFindings = this.acceptFindings(normalizedFindings);
+        // Б1: узел привязывается к ключу и новой находки, и повтора уже известной - перерисовка SPA
+        // отдаёт новые узлы с теми же находками, и без этого находка ушла бы вместе со старым узлом.
+        const accepted = new Set(acceptedFindings);
+        for (const finding of normalizedFindings) {
+            this.anchorFinding(finding.dedupeKey, element, accepted.has(finding));
+        }
         if (acceptedFindings.length === 0) {
             return;
         }
@@ -435,6 +463,11 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
         if (mutations.length === 0) {
             return;
         }
+
+        // Б1: удаление узлов - повод проверить, остались ли на странице узлы известных находок.
+        // Батч без новых корней при этом ничего не анализирует.
+        const removesNodes = this.findingAnchors.size > 0
+            && mutations.some((mutation) => mutation.removedNodes?.length > 0);
 
         const recordLimit = Math.min(mutations.length, this.maxPendingMutationRecords);
         if (mutations.length > recordLimit) {
@@ -499,7 +532,7 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
             }
         }
 
-        if (this.pendingMutationRoots.size > 0) {
+        if (this.pendingMutationRoots.size > 0 || removesNodes) {
             this.scheduleMutationBatch();
         }
     }
@@ -541,7 +574,12 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
             this.mutationBatchTimer = null;
             const roots = [...this.pendingMutationRoots];
             this.pendingMutationRoots.clear();
-            if (roots.length === 0 || !this.isEnabled) {
+            if (!this.isEnabled) {
+                return;
+            }
+            if (roots.length === 0) {
+                // Батч без новых корней - только удаления узлов (Б1).
+                this.settleFindingCount();
                 return;
             }
 
@@ -550,6 +588,7 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
             // полным сканом не мог физически; теперь он уступает event-loop, и гейт стал не
             // страховкой, а необходимостью.
             await this.runGuardedScan('mutation-batch', () => this.processMutationRoots(roots));
+            this.settleFindingCount();
             if (this.pendingMutationRoots.size > 0) {
                 this.scheduleMutationBatch();
             }
@@ -671,6 +710,7 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
         this.stopScheduledWork();
         this.recentFindings = [];
         this.seenFindingKeys.clear();
+        this.findingAnchors.clear();
     }
 
     // Pause keeps the results and drops everything else (C1/C2). What must go: the timer and the
@@ -726,10 +766,14 @@ export default class LinkDomainSecurityDetector extends ModuleCore {
         // fragment of a javascript: payload or a data: URI taken off the page. The set of seen keys
         // already holds what the deduplication needs.
         const { dedupeKey, ...publishedFinding } = finding;
-        this.recentFindings.unshift({
+        const entry = {
             ...publishedFinding,
             timestamp: Date.now()
-        });
+        };
+        if (dedupeKey) {
+            this.recentFindingKeys.set(entry, dedupeKey);
+        }
+        this.recentFindings.unshift(entry);
 
         if (this.recentFindings.length > this.maxRecordedFindings) {
             this.recentFindings = this.recentFindings.slice(0, this.maxRecordedFindings);

@@ -148,6 +148,17 @@ export default class ModuleCore {
             lastScanTime: 0,
             totalScanTime: 0
         };
+        // АКТИВНЫЙ НАБОР НАХОДОК (Б1, 2026-09-11). Бейдж обязан означать «проблемы, которые сейчас
+        // на странице», а модули с дедупликацией по содержимому (visual, link) считали всё, что
+        // видели с последнего полного скана: удалённый узел оставался находкой до перезагрузки.
+        // Здесь - общая часть: к ключу принятой находки привязываются узлы, на которых она есть
+        // (включая повторы после перерисовки SPA), и находка снимается, когда ни одного из них не
+        // осталось в документе. Свои счётчики и списки модуль правит в pruneDetachedFindings().
+        // Узлы держатся через WeakRef: снятый со страницы узел не должен жить из-за нас до
+        // следующего снапшота.
+        this.findingAnchors = new Map();
+        this.maxAnchorsPerFinding = 8;
+        this.lastAnnouncedFindingCount = 0;
         this.lastMutationTime = 0;
         this.mutationThrottle = 100; // ms
         // TIME-SLICING (C2). Скан идёт в main-thread СТРАНИЦЫ пользователя, поэтому «уложиться в
@@ -731,11 +742,18 @@ export default class ModuleCore {
     // Модуль отдаёт СОДЕРЖИМОЕ через хуки ниже и никогда не описывает форму.
     // Снапшот только читает состояние: он не сканирует и вызывается в том числе на паузе.
     buildScanSnapshot() {
+        // Находки, чьи узлы ушли со страницы, снимаются до того, как их посчитают (Б1). Это не скан:
+        // проверяется только isConnected у уже известных узлов, поэтому и на паузе это законно.
+        this.pruneDetachedFindings();
         const snapshotState = this.getSnapshotState();
         const serialized = this.getSerializedFindings();
+        const findingCount = this.getFindingCount();
+        // Опубликованное число - точка отсчёта для announceFindingCount(): сообщать есть смысл
+        // только о расхождении с тем, что рантайм уже видел.
+        this.lastAnnouncedFindingCount = findingCount;
         return {
             module: this.moduleName,
-            threatsDetected: this.getFindingCount(),
+            threatsDetected: findingCount,
             findings: serialized.findings,
             findingsTruncated: serialized.findingsTruncated,
             revision: serialized.revision,
@@ -769,6 +787,78 @@ export default class ModuleCore {
         };
     }
 
+    // --- Активный набор находок (Б1) ---------------------------------------------------------------
+    // Пользуются visual-manipulation и link-domain-security. trigger-phrases и prompt-splitting ведут
+    // активный набор сами и эти методы не зовут; для них pruneDetachedFindings() - пустое умолчание.
+
+    // `isNewFinding`: находка только что принята и посчитана. Повтор уже известной находки (тот же
+    // ключ на новом узле после перерисовки) дописывает узел, но не заводит запись: ключ без записи -
+    // находка, которую модуль не прибавлял, и вычитать её из счётчика нельзя.
+    anchorFinding(key, element, isNewFinding) {
+        if (typeof key !== 'string' || !key || !(element instanceof Element)) {
+            return;
+        }
+        let anchors = this.findingAnchors.get(key);
+        if (!anchors) {
+            if (!isNewFinding) {
+                return;
+            }
+            anchors = [];
+            this.findingAnchors.set(key, anchors);
+        }
+        if (anchors.length >= this.maxAnchorsPerFinding
+            || anchors.some((anchor) => this.derefFindingAnchor(anchor) === element)) {
+            return;
+        }
+        anchors.push(typeof WeakRef === 'function' ? new WeakRef(element) : element);
+    }
+
+    derefFindingAnchor(anchor) {
+        return typeof anchor?.deref === 'function' ? anchor.deref() : anchor;
+    }
+
+    // Ключи находок, у которых не осталось ни одного узла в документе. Только чтение isConnected у
+    // уже известных узлов - обхода DOM здесь нет. Узел, про который неизвестно, подключён ли он
+    // (заглушка без isConnected), считается живым: неизвестность - не повод снимать находку.
+    collectDetachedFindingKeys() {
+        const detached = [];
+        for (const [key, anchors] of this.findingAnchors) {
+            const live = anchors.filter((anchor) => {
+                const element = this.derefFindingAnchor(anchor);
+                return element !== undefined && element.isConnected !== false;
+            });
+            if (live.length === 0) {
+                this.findingAnchors.delete(key);
+                detached.push(key);
+            } else if (live.length !== anchors.length) {
+                this.findingAnchors.set(key, live);
+            }
+        }
+        return detached;
+    }
+
+    // Хук: снять находки ушедших узлов и поправить свои счётчики и списки. Возвращает число снятых.
+    pruneDetachedFindings() {
+        return 0;
+    }
+
+    // Сообщить рантайму, что число находок разошлось с опубликованным, - так бейдж следует за
+    // страницей. Только при расхождении: большинство батчей мутаций находок не меняет.
+    announceFindingCount() {
+        const count = this.getFindingCount();
+        if (count === this.lastAnnouncedFindingCount) {
+            return;
+        }
+        this.lastAnnouncedFindingCount = count;
+        this.dispatchEvent('findingStateChanged', { count });
+    }
+
+    // Конец батча мутаций: снять ушедшее, сообщить об изменении.
+    settleFindingCount() {
+        this.pruneDetachedFindings();
+        this.announceFindingCount();
+    }
+
     // Получение статистики
     getStats() {
         return {
@@ -798,9 +888,9 @@ export default class ModuleCore {
         Logger.debug(`[${this.moduleName}] Statistics reset`);
     }
 
-    // Система событий для межмодульного взаимодействия. Ровно одна живая пара потребителей
-    // (C1, разбор 2026-09-07): prompt-splitting шлёт `findingStateChanged`, js/content.js его
-    // слушает. `off()` был удалён вместе с остальной мёртвой поверхностью - подписчик снимается
+    // Система событий для межмодульного взаимодействия. Одно живое событие и один слушатель
+    // (C1, разбор 2026-09-07): `findingStateChanged` шлёт prompt-splitting, а с Б1 (2026-09-11) ещё
+    // visual-manipulation и link-domain-security через announceFindingCount(); js/content.js слушает. `off()` был удалён вместе с остальной мёртвой поверхностью - подписчик снимается
     // вместе с модулем; если понадобится отписка, её вернуть проще, чем объяснять мёртвый метод.
     eventHandlers = new Map();
 

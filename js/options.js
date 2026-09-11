@@ -113,9 +113,13 @@ class OptionsManager {
         container.innerHTML = `
             <div class="component-error">
                 <p data-i18n="componentLoadError">Failed to load component</p>
-                <button onclick="location.reload()" data-i18n="reloadPage">Reload Page</button>
+                <button data-i18n="reloadPage">Reload Page</button>
             </div>
         `;
+        // Встроенный onclick="..." запрещён CSP страниц расширения (MV3, script-src 'self'): кнопка
+        // рисовалась и не делала ничего. Обработчик вешается из кода - здесь и ниже в
+        // showNotification/showError.
+        container.querySelector('.component-error button')?.addEventListener('click', () => location.reload());
         I18n.applyTranslations(container);
     }
 
@@ -709,7 +713,13 @@ class OptionsManager {
     showNotification(message, type = 'info') {
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        notification.innerHTML = `<span>${message}</span><button class="notification-close" onclick="this.parentElement.remove()">X</button>`;
+        const text = document.createElement('span');
+        text.textContent = message;
+        const closeButton = document.createElement('button');
+        closeButton.className = 'notification-close';
+        closeButton.textContent = 'X';
+        closeButton.addEventListener('click', () => notification.remove());
+        notification.append(text, closeButton);
         notification.style.cssText = 'position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:4px;color:white;z-index:1000;animation:slideIn 0.3s ease;display:flex;align-items:center;gap:10px;';
         notification.style.background = ({ success: '#137333', error: '#d93025', warn: '#f29900', info: '#1a73e8' }[type]) || '#1a73e8';
         document.body.appendChild(notification);
@@ -723,7 +733,14 @@ class OptionsManager {
     showError(message) {
         const errorDiv = document.createElement('div');
         errorDiv.className = 'global-error';
-        errorDiv.innerHTML = `<h3>${I18n.getMessage('globalErrorTitle')}</h3><p>${message}</p><button onclick="location.reload()">${I18n.getMessage('reloadPage')}</button>`;
+        const title = document.createElement('h3');
+        title.textContent = I18n.getMessage('globalErrorTitle');
+        const text = document.createElement('p');
+        text.textContent = message;
+        const reloadButton = document.createElement('button');
+        reloadButton.textContent = I18n.getMessage('reloadPage');
+        reloadButton.addEventListener('click', () => location.reload());
+        errorDiv.append(title, text, reloadButton);
         document.body.innerHTML = '';
         document.body.appendChild(errorDiv);
     }

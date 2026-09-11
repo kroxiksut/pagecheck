@@ -180,11 +180,13 @@ class ModuleManager {
                 module.updateConfig(moduleConfig);
                 module.isEnabled = false;
                 this.modules.set(module.moduleName, module);
-                if (module.moduleName === PROMPT_SPLITTING_MODULE_ID) {
-                    module.on('findingStateChanged', () => {
-                        this.scheduleModuleStatusPublish(module.moduleName);
-                    });
-                }
+                // findingStateChanged: модуль сообщает, что число его находок изменилось. Раньше
+                // его слал только prompt-splitting; с Б1 (2026-09-11) - ещё visual и link, чтобы
+                // бейдж следовал за страницей, а не ждал явного скана или смены вкладки. Подписка
+                // общая: модуль, который событие не шлёт, ничего за неё не платит.
+                module.on('findingStateChanged', () => {
+                    this.scheduleModuleStatusPublish(module.moduleName);
+                });
             });
 
             Logger.info(`Modules prepared: ${this.modules.size}; active modules wait for foreground lifecycle`);
@@ -297,8 +299,7 @@ class ModuleManager {
     }
 
     scheduleModuleStatusPublish(moduleName) {
-        if (moduleName !== PROMPT_SPLITTING_MODULE_ID
-            || this.lifecycleState !== 'active'
+        if (this.lifecycleState !== 'active'
             || !this.activeModuleNames.has(moduleName)) {
             return;
         }
@@ -313,7 +314,7 @@ class ModuleManager {
             if (pending.length === 0
                 || !this.isLifecycleRevisionCurrent(lifecycleRevision)
                 || this.lifecycleState !== 'active'
-                || !this.activeModuleNames.has(PROMPT_SPLITTING_MODULE_ID)) {
+                || !pending.some((name) => this.activeModuleNames.has(name))) {
                 return;
             }
             await this.publishPageStatus(this.buildCurrentScanResponse());
@@ -1199,9 +1200,41 @@ class ModuleManager {
         try {
             return await chrome.runtime.sendMessage(message);
         } catch (error) {
+            // После перезагрузки или обновления расширения этот скрипт остаётся на странице сиротой:
+            // связи с расширением у него больше нет (chrome.runtime.id пропадает), а наблюдатели
+            // модулей и таймеры продолжают работать. Раньше сирота так и крутился вхолостую до
+            // перезагрузки страницы, а с живым бейджем (Б1) ещё и писал ошибку на каждую публикацию.
+            if (!chrome.runtime?.id) {
+                this.stopOrphanedRuntime();
+                return null;
+            }
             Logger.error('Error sending message to background:', error);
             return null;
         }
+    }
+
+    // Сирота гасится один раз и молча: сообщить об ошибке всё равно некуда, а работа в
+    // main-thread страницы без хозяина - ровно то, что запрещает контракт foreground-only.
+    stopOrphanedRuntime() {
+        if (this.orphaned) {
+            return;
+        }
+        this.orphaned = true;
+        this.lifecycleRequestRevision += 1;
+        this.lifecycleState = 'paused';
+        for (const module of this.modules.values()) {
+            try {
+                module.destroy();
+            } catch {
+                // модуль, который не смог остановиться, остановит перезагрузка страницы
+            }
+        }
+        this.activeModuleNames.clear();
+        this.pausedModuleNames.clear();
+        this.removeDocumentChangeTripwire();
+        this.longTaskObserver?.disconnect();
+        this.longTaskObserver = null;
+        Logger.info('Extension context is gone (reloaded or updated): PageCheck stopped on this page until it is reloaded');
     }
 }
 

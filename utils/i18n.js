@@ -32,6 +32,18 @@ export const I18n = {
 
             if (languageMessages && languageMessages[key] && typeof languageMessages[key].message === 'string') {
                 message = languageMessages[key].message;
+                // Именованные подстановки ($MS$, $COUNT$) Chrome раскрывает через блок placeholders:
+                // имя без учёта регистра заменяется на `content`, а уже в нём стоит `$1`. Этот путь
+                // берёт сообщение из загруженного messages.json в обход chrome.i18n, и раньше знал
+                // только `$1` - поэтому пользователь видел «Сканирование заняло $MS$ мс» буквально.
+                const placeholders = languageMessages[key].placeholders;
+                if (placeholders && typeof placeholders === 'object') {
+                    message = message.replace(/\$([A-Za-z0-9_@]+)\$/g, (match, name) => {
+                        const declared = Object.entries(placeholders)
+                            .find(([placeholderName]) => placeholderName.toLowerCase() === name.toLowerCase());
+                        return typeof declared?.[1]?.content === 'string' ? declared[1].content : match;
+                    });
+                }
                 if (safeSubstitutions && safeSubstitutions.length > 0) {
                     message = message.replace(/\$(\d+)/g, (match, index) => {
                         const replacement = safeSubstitutions[Number(index) - 1];

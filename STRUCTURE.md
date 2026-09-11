@@ -30,7 +30,7 @@
 |   |   `-- README.ru.md
 |   |-- visual-manipulation/
 |   |   |-- VisualManipulationDetector.js
-|   |   |-- *.test.mjs                      # module-level shield tests (scan budget, dedupe keys, pause keeps findings)
+|   |   |-- *.test.mjs                      # module-level shield tests (scan budget, dedupe keys, pause keeps findings, active findings: removed nodes leave the badge)
 |   |   |-- detectors/
 |   |   |   |-- hiddenTextDetector.js
 |   |   |   |-- hiddenInputDetector.js
@@ -46,7 +46,7 @@
 |   |   `-- README.ru.md
 |   |-- link-domain-security/
 |   |   |-- LinkDomainSecurityDetector.js
-|   |   |-- *.test.mjs                      # module-level shield tests (finding identity, hostname memo, error visibility, base URI, formaction)
+|   |   |-- *.test.mjs                      # module-level shield tests (finding identity, hostname memo, error visibility, base URI, formaction, active findings)
 |   |   |-- detectors/
 |   |   |   |-- hostnameSecurityDetector.js
 |   |   |   |-- navigationTargetDetector.js
@@ -138,7 +138,9 @@
 |-- js/
 |   |-- background.js
 |   |-- backgroundRuntime.test.mjs           # core-contract shield tests (listener registration, config reapply, scan target)
+|   |-- backgroundWakeDeadlock.test.mjs      # shield: SW wake with a live foreground tab must not deadlock init() against the tab's own publish
 |   |-- content.js
+|   |-- contentOrphanStop.test.mjs           # shield: after an extension reload the orphaned content script stops its modules once, silently
 |   |-- findings-api.js
 |   |-- intervention-layer.js               # active remediation: intention queue, applied-edit registry, rollback (C4.3)
 |   |-- interventionLayer.test.mjs          # shield: gate closed by default, marks are ours, disabling reverts, link and region notes go beside the node (C4.3)
@@ -193,12 +195,12 @@
 |-- tests/
 |   |-- encoding.test.mjs
 |   |-- data-lists.test.mjs                  # shield: every offline data list carries @data-list with its staleness direction (C7.2)
-|   |-- i18n-coverage.test.mjs               # shield: EN/RU key parity, keys named in markup AND in code, placeholder parity
+|   |-- i18n-coverage.test.mjs               # shield: EN/RU key parity, keys named in markup AND in code, placeholder parity, placeholders actually resolved by I18n.getMessage
 |   |-- manifest-contract.test.mjs
 |   |-- options-config-contract.test.mjs     # shield: every rendered field is stored, every stored setting is reachable
 |   |-- permissions-contract.test.mjs       # shield: every declared permission has a caller or a declarative owner; webRequest stays optional
 |   |-- message-protocol-contract.test.mjs  # shield: every sent action is handled; every handler without a sender is declared
-|   |-- ui-controls-contract.test.mjs       # shield: every interactive control is reachable from code; dead ones are declared
+|   |-- ui-controls-contract.test.mjs       # shield: every interactive control is reachable from code; dead ones are declared; no inline on*= handlers (CSP)
 |   |-- web-accessible-contract.test.mjs    # shield: everything the content script loads (and its import chain) is web-accessible
 |   |-- no-network-contract.test.mjs        # shield: the "fully local" promise - no network primitives, every fetch targets extension resources
 |   `-- release-certification.test.mjs

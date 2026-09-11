@@ -89,6 +89,7 @@ export default class VisualManipulationDetector extends ModuleCore {
         this.recentFindings = [];
         this.totalFindingsCurrentScan = 0;
         this.seenDedupeKeys.clear();
+        this.findingAnchors.clear();
         this.candidatesInspected = 0;
         this.candidateBudgetReached = 0;
         this.mutationRecordsDropped = 0;
@@ -177,6 +178,21 @@ export default class VisualManipulationDetector extends ModuleCore {
         return Math.max(0, Math.trunc(Number(this.totalFindingsCurrentScan) || 0));
     }
 
+    // Б1: находка, чьих узлов больше нет в документе, уходит из счётчика, из списка и из ключей
+    // дедупликации - вернувшись на страницу, она будет найдена и посчитана заново.
+    pruneDetachedFindings() {
+        const detachedKeys = this.collectDetachedFindingKeys();
+        if (detachedKeys.length === 0) {
+            return 0;
+        }
+        const detached = new Set(detachedKeys);
+        detachedKeys.forEach((key) => this.seenDedupeKeys.delete(key));
+        this.recentFindings = this.recentFindings.filter((finding) => !detached.has(finding.dedupeKey));
+        this.totalFindingsCurrentScan = Math.max(0, this.totalFindingsCurrentScan - detachedKeys.length);
+        this.stats.threatsDetected = Math.max(0, this.stats.threatsDetected - detachedKeys.length);
+        return detachedKeys.length;
+    }
+
     scanElement(element, knownPriority = null) {
         if (!(element instanceof Element) || !this.isEnabled) {
             return;
@@ -263,10 +279,21 @@ export default class VisualManipulationDetector extends ModuleCore {
             if (this.seenDedupeKeys.size >= this.maxDedupeKeys) {
                 const oldestKey = this.seenDedupeKeys.values().next().value;
                 this.seenDedupeKeys.delete(oldestKey);
+                // Вытесненная находка остаётся посчитанной: снимать её по узлам больше нельзя,
+                // иначе счётчик уйдёт ниже того, что модуль когда-либо прибавил (Б1).
+                this.findingAnchors.delete(oldestKey);
             }
             this.seenDedupeKeys.add(dedupeKey);
             return true;
         });
+
+        // Б1: узел привязывается к ключу и новой находки, и повтора уже известной - перерисовка
+        // SPA отдаёт новые узлы с теми же находками, и без этого находка ушла бы вместе со старым
+        // узлом, хотя на странице осталась.
+        const accepted = new Set(acceptedFindings);
+        for (const finding of normalizedFindings) {
+            this.anchorFinding(finding.dedupeKey, element, accepted.has(finding));
+        }
 
         if (acceptedFindings.length === 0) {
             return;
@@ -312,6 +339,13 @@ export default class VisualManipulationDetector extends ModuleCore {
         const mutations = this.filterForeignMutations(rawMutations);
         if (mutations.length === 0) {
             return;
+        }
+
+        // Удаление узлов этот модуль раньше не интересовало (isRelevantMutation), и находка на
+        // удалённом узле жила до следующего полного скана. Теперь удаление - повод проверить
+        // привязанные узлы (Б1); батч без добавлений ничего не анализирует.
+        if (this.findingAnchors.size > 0 && mutations.some((mutation) => mutation.removedNodes?.length > 0)) {
+            this.scheduleMutationBatch();
         }
 
         const remainingCapacity = Math.max(0, this.maxPendingMutations - this.pendingMutations.length);
@@ -557,7 +591,12 @@ export default class VisualManipulationDetector extends ModuleCore {
         this.mutationBatchTimer = setTimeout(async () => {
             this.mutationBatchTimer = null;
             const mutations = this.pendingMutations.splice(0);
-            if (mutations.length === 0 || !this.isEnabled) {
+            if (!this.isEnabled) {
+                return;
+            }
+            if (mutations.length === 0) {
+                // Батч без добавлений - только удаления узлов (Б1).
+                this.settleFindingCount();
                 return;
             }
 
@@ -567,6 +606,7 @@ export default class VisualManipulationDetector extends ModuleCore {
             // Через гейт C5.1: батч теперь уступает event-loop и может чередоваться с полным сканом.
             await this.runGuardedScan('mutation-batch', () => this.processMutationBatch(mutations));
             this.onMutationsProcessed(mutations);
+            this.settleFindingCount();
 
             if (this.pendingMutations.length > 0) {
                 this.scheduleMutationBatch();
